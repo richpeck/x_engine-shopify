@@ -15,14 +15,13 @@
 ################################################################
 ################################################################
 
-class CreateXEngineShopifyShops < ActiveRecord::Migration[8.0]
+class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
 
-  def table_name
-    XEngine::Shopify::Shop.table_name.to_sym
-  end
+  # RPECK 23/04/2026 - Dynamically set resource for table naming logic
+  set_resource :shopify :shop
 
   def up 
-    create_table table_name, if_not_exists: true do |t|
+    create_table table_name, **table_options do |t|
       t.string    :api_version
       t.string    :name
       t.string    :myshopify_domain, index: { unique: true, name: 'unique_myshopify_domain' }
@@ -40,14 +39,11 @@ class CreateXEngineShopifyShops < ActiveRecord::Migration[8.0]
 
       # Extras
       t.references  :credential, null: true
-      t.jsonb       :meta, default: {}, null: false
+      t.json        :meta, default: {}, null: false
 
       t.timestamps 
     end
   end
 
-  def down 
-    drop_table table_name if table_exists?(table_name)
-  end
 end
 # :startdoc:

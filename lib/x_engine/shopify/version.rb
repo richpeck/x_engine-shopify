@@ -19,9 +19,11 @@
 # frozen_string_literal: true
 
 module XEngine
-  # Semantic version of the engine.
-  VERSION = "0.0.1"
+	module Shopify
+	  # Semantic version of the engine.
+	  VERSION = "0.0.1"
 
-  # The official release date of the current version.
-  RELEASE_DATE = "2026-04-27"
+	  # The official release date of the current version.
+	  RELEASE_DATE = "2026-04-27"
+	end
 end

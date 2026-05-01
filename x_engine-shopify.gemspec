@@ -49,7 +49,7 @@ Gem::Specification.new do |spec|
   # == Dependencies
   
   # The official Shopify library for API and Session management
-  spec.add_dependency "shopify_api"
+  spec.add_dependency 'shopify_api', '~> 16.2'
   
   # Persistence layer for Shopify Objects (Orders, Customers)
   spec.add_dependency "activerecord"
