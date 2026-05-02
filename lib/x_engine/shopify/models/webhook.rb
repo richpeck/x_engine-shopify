@@ -1,17 +1,13 @@
-
-
-
-
 module XEngine
-  module SMTP
-    class EmailLog < XEngine::Base
-      # Set dynamic table name or default
-      self.table_name = 'x_engine_smtp_logs'
+  module Shopify
+    class Webhook < XEngine::Core::Model
+      # DSL Declarations
+      excluded_attributes :secret_key, :shopify_webhook_id
       
-      validates :to, presence: true
-      
-      scope :failed, -> { where(status: 'failed') }
-      scope :delivered, -> { where(status: 'delivered') }
+      # Expose the POST endpoint for Shopify to hit
+      # Route: POST /shopify/webhooks/:id
+      expose_as :webhooks, actions: [:create] 
+
     end
   end
 end

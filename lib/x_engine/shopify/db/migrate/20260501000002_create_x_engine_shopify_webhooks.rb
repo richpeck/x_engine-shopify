@@ -1,14 +1,14 @@
 # :stopdoc:
 ################################################################
 ################################################################
-##   ________  ___  ___  ________  ________  ________      
-##  |\   ____\|\  \|\  \|\   __  \|\   __  \|\   ____\     
-##  \ \  \___|\ \  \\\  \ \  \|\  \ \  \|\  \ \  \___|_    
-##   \ \_____  \ \   __  \ \  \\\  \ \   ____\ \_____  \   
-##    \|____|\  \ \  \ \  \ \  \\\  \ \  \___|\|____|\  \  
-##      ____\_\  \ \__\ \__\ \_______\ \__\     ____\_\  \ 
-##     |\_________\|__|\|__|\|_______|\|__|    |\_________\
-##     \|_________|                            \|_________|         
+##   ___       __   _______   ________  ___  ___  ________  ________  ___  __    ________      
+##  |\  \     |\  \|\  ___ \ |\   __  \|\  \|\  \|\   __  \|\   __  \|\  \|\  \ |\   ____\     
+##  \ \  \    \ \  \ \   __/|\ \  \|\ /\ \  \\\  \ \  \|\  \ \  \|\  \ \  \/  /|\ \  \___|_    
+##   \ \  \  __\ \  \ \  \_|/_\ \   __  \ \   __  \ \  \\\  \ \  \\\  \ \   ___  \ \_____  \   
+##    \ \  \|\__\_\  \ \  \_|\ \ \  \|\  \ \  \ \  \ \  \\\  \ \  \\\  \ \  \\ \  \|____|\  \  
+##     \ \____________\ \_______\ \_______\ \__\ \__\ \_______\ \_______\ \__\\ \__\____\_\  \ 
+##      \|____________|\|_______|\|_______|\|__|\|__|\|_______|\|_______|\|__| \|__|\_________\
+##                                                                                 \|_________|
 ##  --
 ##  RPECK 23/04/2026 - Shopify Webhooks Migration
 ##  Defines the schema for Shopify stores within XEngine.
@@ -22,27 +22,28 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
   def up 
     create_table table_name, **table_options do |t|
-      t.string    :api_version
-      t.string    :name
-      t.string    :myshopify_domain, index: { unique: true, name: 'unique_myshopify_domain' }
-      t.string    :email, null: false
-      t.string    :url, null: false
-      t.string    :currency_code, default: 'USD'
 
-      # Billing Details
-      t.string    :billing_address, null: true
-      t.string    :billing_city,    null: true
-      t.string    :billing_company, null: true
-      t.string    :billing_country, null: true
-      t.string    :billing_zip,     null: true
-      t.string    :billing_phone,   null: true
+			t.belongs_to  :shop, 	foreign_key: { type: :uuid, to_table: shop_table, on_delete: :cascade }, null: false, index: true
 
-      # Extras
-      t.references  :credential, null: true
-      t.json        :meta, default: {}, null: false
+      # Shopify Specifics
+      t.string :shopify_id, index: true 
+      t.string :topic, null: false, index: true
+      
+      # State
+      t.boolean :enabled, default: true, null: false
 
-      t.timestamps 
+      t.timestamps
+
+      # Multi-column index for uniqueness and scoped lookups
+      t.index [:shop_id, :topic], unique: true, name: "idx_shopify_webhooks_on_shop_and_topic"
     end
+  end
+
+  private
+
+  ## RPECK 02/05/2026 - Get the name of the "shop" table
+  def shop_table
+    XEngine::Core::Model.table_name_for(:shopify, :shop)
   end
   
 end

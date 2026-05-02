@@ -18,7 +18,7 @@
 class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
 
   # RPECK 23/04/2026 - Dynamically set resource for table naming logic
-  set_resource :shopify :shop
+  set_resource :shopify, :shop
 
   def up 
     create_table table_name, **table_options do |t|
