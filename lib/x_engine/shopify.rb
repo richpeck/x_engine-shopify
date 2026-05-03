@@ -45,12 +45,10 @@ module XEngine
       # ---
 
       def self.on_register
-        XEngine.configure do |config|
-          config.setting :shopify do
-            config.setting :api_key,    default: ENV.fetch("XENGINE_SHOPIFY_API_KEY",    nil)
-            config.setting :api_secret, default: ENV.fetch("XENGINE_SHOPIFY_API_SECRET", nil)
-            config.setting :scope,      default: ENV.fetch("XENGINE_SHOPIFY_SCOPE",      "read_products,read_orders")
-          end
+        XEngine::Core::Configuration.setting :shopify do
+          setting :api_key,    default: ENV.fetch("XENGINE_SHOPIFY_API_KEY",    nil)
+          setting :api_secret, default: ENV.fetch("XENGINE_SHOPIFY_API_SECRET", nil)
+          setting :scope,      default: ENV.fetch("XENGINE_SHOPIFY_SCOPE",      "read_products,read_orders")
         end
       end
 
@@ -67,8 +65,6 @@ end
 
 # :stopdoc:
 # Initialize Zeitwerk
-loader = Zeitwerk::Loader.new
-loader.tag = "x_engine-shopify"
-loader.push_dir(File.expand_path("x_engine", __dir__)) 
+loader = Zeitwerk::Loader.for_gem_extension(XEngine)
 loader.setup
 # :startdoc:
