@@ -20,51 +20,23 @@
 
 require "zeitwerk"
 
+# = XEngine Shopify
+#
+# The Shopify extension provides seamless integration between XEngine's behavior 
+# trees and the Shopify Admin API. 
+#
+# It utilizes +Zeitwerk+ for lazy-loading and registers itself into the 
+# {XEngine::Core::Registry} to participate in the engine's global boot sequence.
 module XEngine
-  # == XEngine Shopify Extension
-  #
-  # Namespace for Shopify-specific functionality.
   module Shopify
-    # = Shopify Extension Controller
-    #
-    # Manages the lifecycle and configuration of the Shopify stack.
-    class Extension < Core::Extension
-
-      # RPECK 01/05/2026 - Trigger the base class registration logic.
-      # This automatically sets @migration_path to gem_root/db/migrate
-      identifier :shopify
-      
-      # Returns the absolute path to the gem's root directory.
-      # @return [Pathname]
-      def self.root
-        Pathname.new(File.expand_path('..', __dir__))
-      end
-
-      # ---
-      # :section: Lifecycle Hooks
-      # ---
-
-      def self.on_register
-        XEngine::Core::Configuration.setting :shopify do
-          setting :api_key,    default: ENV.fetch("XENGINE_SHOPIFY_API_KEY",    nil)
-          setting :api_secret, default: ENV.fetch("XENGINE_SHOPIFY_API_SECRET", nil)
-          setting :scope,      default: ENV.fetch("XENGINE_SHOPIFY_SCOPE",      "read_products,read_orders")
-        end
-      end
-
-      def self.on_boot
-        # Model and Node registration
-      end
-    end
+    # :stopdoc:
+    # Initialize Zeitwerk to handle constant loading within the XEngine namespace.
+    @loader = Zeitwerk::Loader.for_gem_extension(XEngine)
+    @loader.setup
+    # :startdoc:
   end
 end
 
-# ---
-# :section: Autoloader Setup
-# ---
-
-# :stopdoc:
-# Initialize Zeitwerk
-loader = Zeitwerk::Loader.for_gem_extension(XEngine)
-loader.setup
-# :startdoc:
+# Register the extension with the Core Registry.
+# This ensures XEngine.boot! can trigger the +on_register+ and +on_boot+ hooks.
+XEngine::Core::Registry.register_extension(:shopify, XEngine::Shopify::Extension)
