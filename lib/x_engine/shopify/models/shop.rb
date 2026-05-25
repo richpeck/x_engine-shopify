@@ -22,8 +22,10 @@ module XEngine
   module Shopify
     # == Shopify Shop
     #
-    # Represents a Shopify Store. This model uses the "handle" (subdomain) 
-    # as its primary public identity for clean, readable routing.
+    # Represents a Shopify Store tenant within the XEngine ecosystem. This model uses the 
+    # "handle" (subdomain) as its primary public identity for clean, readable routing, while 
+    # serving as the core cryptographic and multi-tenant parent scoping anchor for webhooks,
+    # transactions, and synchronous platform entity data pipelines.
     #
     class Shop < XEngine::Core::Model
       
@@ -37,6 +39,89 @@ module XEngine
                 actions: [:read, :update],
                 member_actions: { refresh_token: :post }
 
+      # ---
+      # :section: Associations
+      # ---
+
+      # Points directly to the shared secure authentication matrix table inside the Core gem block.
+      belongs_to :credential,
+                 class_name: "XEngine::Core::Models::Credential",
+                 foreign_key: :credential_id,
+                 inverse_of: false
+
+      # State-aware webhook endpoint subscriptions registered for this specific storefront.
+      # Destroying a shop cascades immediately to purge tracking matrices, mitigating orphan records.
+      has_many :webhooks,
+               class_name: "XEngine::Shopify::Webhook",
+               foreign_key: :shop_id,
+               inverse_of: :shop,
+               dependent: :destroy
+
+      # ---
+      # :section: Validations
+      # ---
+
+      validates :credential, presence: true
+      validates :access_token, presence: true
+      validates :handle, presence: true, uniqueness: true
+      validates :myshopify_domain, presence: true, uniqueness: true
+      validates :api_version, presence: true
+      
+      # Defensive security guard: Assert that the associated credential row is explicitly 
+      # scoped for Shopify operations rather than a mislinked mail server setup.
+      validate :validate_provider_integrity, if: :credential
+
+      # ---
+      # :section: Cryptographic Key Resolvers
+      # ---
+      
+      # Extracts the application public client identifier key out of the secure core JSON matrix.
+      # @return [String, nil]
+      def client_key
+        credential&.get(:api_key) || credential&.get(:client_key)
+      end
+
+      # Extracts the application cryptographic secret validation token out of the secure core JSON matrix.
+      # @return [String, nil]
+      def client_secret
+        credential&.get(:api_secret) || credential&.get(:client_secret)
+      end
+
+      # ---
+      # :section: Instance Methods
+      # ---
+
+      # Helper profile evaluator confirming whether a targeted webhook topic is natively
+      # compatible with this shop's currently locked API core version string context.
+      #
+      # @param topic [String] Lowercase wire format token (e.g. "products/update")
+      # @return [Boolean]
+      def webhook_compatible?(topic)
+        XEngine::Shopify::Webhooks::Registry.compatible?(topic, api_version)
+      end
+
+      # Instantiates a clean, thread-isolated API session block for outbound node execution calls
+      # without binding credentials directly to a shared system global state.
+      #
+      # @return [ShopifyAPI::Auth::Session]
+      def to_shopify_session
+        ShopifyAPI::Auth::Session.new(
+          shop: myshopify_domain,
+          access_token: access_token
+        )
+      end
+
+      private
+
+      # Defensive multi-tenant mapping safety check
+      # @return [void]
+      def validate_provider_integrity
+        return if credential.provider_type == "shopify"
+
+        errors.add(:credential_id, "must link directly to an explicit 'shopify' provider type token container profile.")
+      end
+
     end
   end
 end
+# :startdoc:

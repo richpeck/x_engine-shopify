@@ -27,9 +27,19 @@ require_relative "lib/x_engine/shopify/version"
 # via the Shopify API is validated and authenticated via a dedicated middleware stack.
 #
 # == Features
-# * HMAC verification for inbound webhooks.
-# * Shopify-specific nodes for the Workflow Engine.
-# * +ActiveRecord+ models for persisting Shopify data (Orders, Products, etc.).
+# * Cryptographic HMAC context token verification for inbound webhooks via the official API wrapper.
+# * State-aware, multi-tenant persistence layers tracking active, failing, or disabled subscriptions.
+# * Optimized payload footprint scoping via advanced array column structural property targets.
+# * Strict type-safe internal event validation powered by the +dry-rb+ data modeling ecosystem.
+# * High-volume asynchronous GraphQL Bulk Operation runtime extraction and auditing pipelines.
+# * Shopify-specific execution nodes compatible with the universal +XEngine::Core::Nodes+ layout API.
+#
+# == Engine Dependencies
+# [shopify_api]     Platform authentication, access token mechanics, and webhook verification utilities.
+# [dry-struct]      Type-safe layout validation rules for compiling immutable topic configurations.
+# [dry-types]       Comprehensive constraint system managing string, array, and optional attribute bounds.
+# [activerecord]    Relational mapping profiles connecting parent stores to nested operational objects.
+# [zeitwerk]        Strict inflection-compliant directory tree autoloader matching engine patterns.
 Gem::Specification.new do |spec|
 
   # == Metadata
@@ -51,10 +61,15 @@ Gem::Specification.new do |spec|
   # The official Shopify library for API and Session management
   spec.add_dependency 'shopify_api', '~> 16.2'
   
-  # Persistence layer for Shopify Objects (Orders, Customers)
+  # Type-safe object boundaries and attributes constraints for metadata management
+  spec.add_dependency "dry-struct", "~> 1.6"
+  spec.add_dependency "dry-types", "~> 1.7"
+
+  # Persistence layer for Shopify Objects (Shops, Webhooks, Bulk Operations)
   spec.add_dependency "activerecord"
   
   # Autoloading for extension nodes and middleware
   spec.add_dependency "zeitwerk"
 
 end
+# :startdoc:

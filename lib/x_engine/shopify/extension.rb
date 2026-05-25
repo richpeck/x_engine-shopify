@@ -18,6 +18,8 @@
 
 # frozen_string_literal: true
 
+require "shopify_api"
+
 module XEngine
   module Shopify
     # = Shopify Extension Controller
@@ -25,6 +27,7 @@ module XEngine
     # This class manages the lifecycle and configuration schema for the Shopify stack.
     # It inherits from {XEngine::Core::Extension} to gain standardized path
     # and identifier management.
+    #
     class Extension < Core::Extension
 
       # Trigger the base class registration logic.
@@ -49,25 +52,40 @@ module XEngine
       # {XEngine::Core::Configuration}.
       #
       # === Config Options:
-      # [api_key]    The Shopify App API Key (Default: ENV['XENGINE_SHOPIFY_API_KEY'])
-      # [api_secret] The Shopify App API Secret (Default: ENV['XENGINE_SHOPIFY_API_SECRET'])
-      # [scope]      The required OAuth scopes (Default: 'read_products,read_orders')
+      # [api_version] The default locked baseline API target version (Default: '2026-04')
       def self.on_register
         XEngine::Core::Configuration.setting :shopify do
-          setting :api_key,    default: ENV.fetch("XENGINE_SHOPIFY_API_KEY",    nil)
-          setting :api_secret, default: ENV.fetch("XENGINE_SHOPIFY_API_SECRET", nil)
-          setting :scope,      default: ENV.fetch("XENGINE_SHOPIFY_SCOPE",      "read_products,read_orders")
+          setting :api_version, default: ENV.fetch("XENGINE_SHOPIFY_API_VERSION", "2026-04")
         end
       end
 
       # Phase 2: Boot
       #
       # This hook is called by +XEngine.boot!+ after the database is connected.
-      # Use this to register Nodes and Models into the {XEngine::Core::Registry}.
+      # It establishes a dynamic-ready neutral fallback context inside the official gem.
+      # Because keys and secrets live securely inside individual core credential models,
+      # this boilerplate prevents boot crashes while isolating client tenancies.
+      #
       def self.on_boot
-        # Implementation: Register logic nodes for the behavior tree
-        # XEngine::Core::Registry.register_node("shopify.get_order") { ... }
+        # Extract the compiled settings block from Core configuration
+        config = XEngine::Core::Configuration.shopify
+
+        # Initialize the baseline Shopify API Context block.
+        # Passing placeholders satisfies the gem wrapper initialization rules while 
+        # protecting multi-app workflows from thread-safety credential leaks.
+        ShopifyAPI::Context.setup(
+          api_key:       "DYNAMIC_TENANT_ISOLATION_ACTIVE",
+          api_secret:    "DYNAMIC_TENANT_ISOLATION_ACTIVE",
+          scope:         "read_products", # Handled dynamically per-session token loop
+          api_version:   config.api_version,
+          is_embedded:   true,
+          is_private:    false
+        )
+      rescue => e
+        # Prevent engine initializers from silently failing on missing context arrays
+        warn "[XEngine::Shopify] Failed to initialize neutral Shopify API Context: #{e.message}"
       end
     end
   end
 end
+# :startdoc:

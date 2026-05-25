@@ -14,23 +14,53 @@
 ##  Defines the schema for Shopify stores within XEngine.
 ################################################################
 ################################################################
+# :stopdoc:
 
+# = Shopify Webhooks Database Provisioner
+#
+# Generates the multi-tenant tracking schema required to register, monitor, 
+# and selectively filter asynchronous event notifications dispatched from 
+# the Shopify API cluster.
+#
+# == Database Resource Configuration
+# * *Namespace:* +:shopify+
+# * *Resource:* +:webhook+
+#
+# == Schema Layout Matrix
+# [shop_id]            The +uuid+ reference link to the owner store model.
+# [shopify_id]         The unique identification string returned by Shopify's subscription engine.
+# [topic]              The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
+# [filter]             An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
+# [fields]             An array of specific text fields used to limit the dimensions of the incoming data payload.
+# [status]             The current lifecycle operational state of the endpoint registration (Default: <tt>"active"</tt>).
+# [notes]              Text block for logging application exceptions, failure tracing, or system alert states.
+#
+# == Index Profiles
+# * A composite unique index is assigned across <tt>[:shop_id, :topic]</tt> to prevent duplicate subscription matrices per client tenant.
 class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
-  # RPECK 23/04/2026 - Dynamically set resource for table naming logic
+  # Trigger dynamic routing mapping variables for engine table namespaces.
   set_resource :shopify, :webhook
 
+  # Executes schema generation transformations on the target database engine layer.
+  #
+  # @return [void]
   def up 
     create_table table_name, **table_options do |t|
 
-			t.belongs_to  :shop, 	foreign_key: { type: :uuid, to_table: shop_table, on_delete: :cascade }, null: false, index: true
+      t.belongs_to :shop, foreign_key: { type: :uuid, to_table: shop_table, on_delete: :cascade }, null: false, index: true
 
       # Shopify Specifics
-      t.string :shopify_id, index: true 
+      t.string :shopify_id, index: { unique: true }
       t.string :topic, null: false, index: true
       
-      # State
-      t.boolean :enabled, default: true, null: false
+      # Payload Optimization & Filtering
+      t.string :filter, null: true
+      t.string :fields, array: true, default: [], null: false
+
+      # State & Operational Tracking
+      t.string :status, default: "disabled", null: false, index: true
+      t.text   :notes
 
       t.timestamps
 
@@ -41,7 +71,9 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
   private
 
-  ## RPECK 02/05/2026 - Get the name of the "shop" table
+  # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
+  #
+  # @return [String]
   def shop_table
     XEngine::Core::Model.table_name_for(:shopify, :shop)
   end
