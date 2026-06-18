@@ -33,15 +33,22 @@ module XEngine
     class Webhook < XEngine::Core::Model
 
       # ---
+      # :section: Serialization Abstractions
+      # ---
+
+      # Handle SQLite3 structural fallback limitations automatically if native array mutations are dropped
+      serialize :fields, type: JSON, default: []
+
+      # ---
       # :section: Stackable Configuration
       # ---
 
       # Expose the webhook resource configurations using Shopify's native tracking identifier.
-      expose_as :webhooks, 
+      expose_as :shopify_webhooks, 
+                slug: :webhooks,
                 identity: :shopify_id,
-                actions: [:read, :create, :update, :delete],
-                member_actions: { retry: :post }
-
+                actions: [:read, :create, :update, :destroy],
+                member_actions: { sync: :post }
       # ---
       # :section: Associations
       # ---

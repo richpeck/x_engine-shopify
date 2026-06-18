@@ -19,24 +19,45 @@
 # frozen_string_literal: true
 
 require "zeitwerk"
+require "dry/system"
 
-# = XEngine Shopify
+# = XEngine Sidekiq Extension
 #
-# The Shopify extension provides seamless integration between XEngine's behavior 
-# trees and the Shopify Admin API. 
+# Integrates Sidekiq background job processing into the XEngine ecosystem.
+# Coordinates internal autoloader path structures and configures distributed 
+# component provider group matrices.
 #
-# It utilizes +Zeitwerk+ for lazy-loading and registers itself into the 
-# {XEngine::Core::Registry} to participate in the engine's global boot sequence.
 module XEngine
   module Shopify
-    # :stopdoc:
-    # Initialize Zeitwerk to handle constant loading within the XEngine namespace.
-    @loader = Zeitwerk::Loader.for_gem_extension(XEngine)
-    @loader.setup
-    # :startdoc:
+    # Dedicated, high-performance Zeitwerk loader for the Sidekiq gem extension layer.
+    # 
+    # @return [Zeitwerk::Loader] The active tracking loader instance.
+    #
+    LOADER = Zeitwerk::Loader.for_gem_extension(XEngine).tap do |loader|
+      # Enforce uppercase acronym conversion rules for terminal CLI boundaries
+      loader.inflector.inflect("graphql" => "graphQL")
+      
+      # CRITICAL: Bypasses the providers folder so Zeitwerk doesn't mistake 
+      # its contents for continuous Ruby constant namespaces.
+      loader.ignore("#{__dir__}/providers")
+      
+      # Commit changes and establish the tracking system maps
+      loader.setup
+    end
   end
 end
 
-# Register the extension with the Core Registry.
-# This ensures XEngine.boot! can trigger the +on_register+ and +on_boot+ hooks.
-XEngine::Core::Registry.register_extension(:shopify, XEngine::Shopify::Extension)
+# --- SYSTEM PROVIDER GROUP MATRIX CONFIGURATION ---
+# Inform the container system that this extension group's external providers are 
+# located inside our isolated local +./providers+ folder.
+#
+# This implicitly maps the file located at <tt>lib/x_engine/providers/sidekiq.rb</tt> 
+# containing the central +Dry::System.register_provider_source+ configuration schemas.
+#
+Dry::System.register_provider_sources(File.join(__dir__, "providers"))
+
+# --- AUTOMATIC APPLICATION ADAPTER BINDING ---
+# Automatically mounts the background processor provider component onto the running 
+# framework master container tree if it has been evaluated into active process memory.
+#
+XEngine::Application.register_provider(:shopify, from: :x_engine) if defined?(XEngine::Application)

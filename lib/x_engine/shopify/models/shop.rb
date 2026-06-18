@@ -33,10 +33,11 @@ module XEngine
       # :section: Stackable Configuration
       # ---
 
-      # Expose the shop using its handle (e.g. /shopify/garrys-glasses)
-      expose_as :shops, 
+      # Target the explicit 'shopify_shops' container key while leaving the route as 'shops'
+      expose_as :shopify_shops, 
+                slug: :shops,
                 identity: :handle,
-                actions: [:read, :update],
+                actions: [:read, :update, :destroy],
                 member_actions: { refresh_token: :post }
 
       # ---
@@ -53,6 +54,14 @@ module XEngine
       # Destroying a shop cascades immediately to purge tracking matrices, mitigating orphan records.
       has_many :webhooks,
                class_name: "XEngine::Shopify::Webhook",
+               foreign_key: :shop_id,
+               inverse_of: :shop,
+               dependent: :destroy
+
+      # Consolidated collection of rich asset components (images, videos, and 3D models)
+      # tied directly to this store instance. Orphan records are automatically purged on destruction.
+      has_many :product_media,
+               class_name: "XEngine::Shopify::ProductMedia",
                foreign_key: :shop_id,
                inverse_of: :shop,
                dependent: :destroy

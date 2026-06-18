@@ -3,7 +3,7 @@
 ################################################################
 ##  ________  ___  ___  ___       ___  __             ________  ________  _______   ________  ________  _________  ___  ________  ________      
 ## |\   __  \|\  \|\  \|\  \     |\  \|\  \           |\   __  \|\   __  \|\  ___ \ |\   __  \|\   __  \|\___   ___\\  \|\   __  \|\   ___  \    
-## \ \  \|\ /\ \  \\\  \ \  \    \ \  \/  /|_         \ \  \|\  \ \  \|\  \ \  \__ /|\ \  \|\  \ \  \|\  \|___ \  \_\ \  \ \  \|\  \ \  \\ \  \   
+## \ \  \|\ /\ \  \\\  \ \  \    \ \  \/  /|_         \ \  \|\  \ \  \|\  \ \  \__ /|\ \  \|\ \ \  \|\  \|___ \  \_\ \  \ \  \|\  \ \  \\ \  \   
 ##  \ \   __  \ \  \\\  \ \  \    \ \   ___  \         \ \  \\\  \ \   ____\ \  \_|/_\ \  _  __\ \  .__  \   \ \  \ \ \  \ \  \\\  \ \  \\ \  \  
 ##   \ \  \|\  \ \  \\\  \ \  \____\ \  \\ \  \         \ \  \\\  \ \  \___|\ \  \_|\ \ \  \\  \\ \  \ \  \   \ \  \ \ \  \ \  \\\  \ \  \\ \  \ 
 ##    \ \_______\ \_______\ \_______\ \__\\ \__\         \ \_______\ \__\    \ \_______\ \__\\ _\\ \__\ \__\   \ \__\ \ \__\ \_______\ \__\\ \__\
@@ -35,11 +35,11 @@ module XEngine
       # :section: Stackable Configuration
       # ---
 
-      # Register this structural asset with standard multi-tenant identifier hooks.
-      # Utilizes the official Shopify global tracking identifier (GID) for lookup routes.
-      expose_as :bulk_operations,
+      # Decouple internal keys while exposing a clean 'bulk_operations' path
+      expose_as :shopify_bulk_operations,
+                slug: :bulk_operations,
                 identity: :shopify_id,
-                actions: [:read, :create, :delete],
+                actions: [:read, :create, :destroy], # Swapped :delete to :destroy
                 member_actions: { cancel: :post }
 
       # ---

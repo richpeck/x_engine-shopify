@@ -48,7 +48,7 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
   def up 
     create_table table_name, **table_options do |t|
 
-      t.belongs_to :shop, foreign_key: { type: :uuid, to_table: shop_table, on_delete: :cascade }, null: false, index: true
+      t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
 
       # Shopify Specifics
       t.string :shopify_id, index: { unique: true }
@@ -56,7 +56,7 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
       
       # Payload Optimization & Filtering
       t.string :filter, null: true
-      t.string :fields, array: true, default: [], null: false
+      t.string :fields, null: true
 
       # State & Operational Tracking
       t.string :status, default: "disabled", null: false, index: true

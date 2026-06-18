@@ -1,0 +1,84 @@
+# :stopdoc:
+################################################################
+################################################################
+##   ________  ________  ________  ________  ___  ___  ________ _________        ________  ________  ___       ___       _______   ________ _________  ___  ________  ________   ________      
+##  |\   __  \|\   __  \|\   __  \|\   ___ \|\  \|\  \|\   ____\\___   ___\     |\   ____\|\   __  \|\  \     |\  \     |\  ___ \ |\   ____\\___   ___\\  \|\   __  \|\   ___  \|\   ____\     
+##  \ \  \|\  \ \  \|\  \ \  \|\  \ \  \_|\ \ \  \\\  \ \  \___\|___ \  \_|     \ \  \___|\ \  \|\  \ \  \    \ \  \    \ \   __/|\ \  \___\|___ \  \_\ \  \ \  \|\  \ \  \\ \  \ \  \___|_    
+##   \ \   ____\ \   _  _\ \  \\\  \ \  \ \\ \ \  \\\  \ \  \       \ \  \       \ \  \    \ \  \\\  \ \  \    \ \  \    \ \  \_|/_\ \  \       \ \  \ \ \  \ \  \\\  \ \  \\ \  \ \_____  \   
+##    \ \  \___|\ \  \\  \\ \  \\\  \ \  \_\\ \ \  \\\  \ \  \____   \ \  \       \ \  \____\ \  \\\  \ \  \____\ \  \____\ \  \_|\ \ \  \____   \ \  \ \ \  \ \  \\\  \ \  \\ \  \|____|\  \  
+##     \ \__\    \ \__\\ _\\ \_______\ \_______\ \_______\ \_______\  \ \__\       \ \_______\ \_______\ \_______\ \_______\ \_______\ \_______\  \ \__\ \ \__\ \_______\ \__\\ \__\____\_\  \ 
+##      \|__|     \|__|\|__|\|_______|\|_______|\|_______|\|_______|   \|__|        \|_______|\|_______|\|_______|\|_______|\|_______|\|_______|   \|__|  \|__|\|_______|\|__| \|__|\_________\
+##                                                                                                                                                                                 \|_________|
+##                                                                                                          
+## --
+## RPECK 17/06/2026 - Products Collections Join Table
+## Defines the relational HABTM bridge layout table mapping products to collections within XEngine.
+################################################################
+################################################################
+
+# = Shopify Products Collections Association Join Table Provisioner
+#
+# Generates the relational bridge table mapping shopify product models to their
+# respective collections in a multi-tenant many-to-many lookup topology.
+#
+# == Database Resource Configuration
+# * *Namespace:* +:shopify+
+# * *Resource:* +:products_collections+
+#
+# == Schema Layout Matrix
+# [product_id]    Foreign key reference pointing to the parent Product. Constrained to <tt>bigint</tt> to match Shopify's naked ID strategy.
+# [collection_id] Foreign key reference pointing to the parent Collection. Constrained to <tt>bigint</tt> to match Shopify's naked ID strategy.
+#
+# == Architectural Guardrails
+# * *Cascade Deletion:* Drops the relationship records automatically if either the parent product or collection record is destroyed.
+# * *Index Size Ceiling:* Explicitly overrides index names to bypass PostgreSQL's strict 63-character limit constraint rule.
+class CreateXEngineShopifyProductsCollectionsJoinTable < XEngine::Core::Database::Migration
+
+  # Enforce structural namespacing parameters for the join table layout target
+  set_resource :shopify, :products_collections
+
+  # Executes schema generation transformations on the target database engine layer.
+  #
+  # @return [void]
+  def up
+    # Force id: false to eliminate standard auto-incrementing / UUID primary key blocks
+    localized_options = table_options.merge(id: false)
+
+    create_table table_name, **localized_options do |t|
+      
+      # 1. Foreign key pointing to the Product table (CRITICAL: Must be :bigint to match Shopify's naked ID)
+      t.references :product,
+                   type: :bigint,
+                   null: false,
+                   foreign_key: { to_table: product_table, on_delete: :cascade }
+
+      # 2. Foreign key pointing to the Collection table (CRITICAL: Must be :bigint to match Shopify's naked ID)
+      t.references :collection,
+                   type: :bigint,
+                   null: false,
+                   foreign_key: { to_table: collection_table, on_delete: :cascade }
+
+      # 3. Composite index optimizing fast bidirectional filtering lookups
+      t.index [:product_id, :collection_id],
+              name: "idx_xe_shopify_prod_colls_poly",
+              unique: true
+
+    end
+  end
+
+  private
+
+  # Resolves the fully namespaced physical table string value for the Product resource.
+  # @return [String]
+  def product_table
+    XEngine::Core::Model.table_name_for(:shopify, :product)
+  end
+
+  # Resolves the fully namespaced physical table string value for the Collection resource.
+  # @return [String]
+  def collection_table
+    XEngine::Core::Model.table_name_for(:shopify, :collection)
+  end
+
+end
+# :startdoc:
