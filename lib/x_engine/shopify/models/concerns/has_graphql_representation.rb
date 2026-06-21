@@ -8,10 +8,10 @@
 ##    \ \  \|\  \ \  \\  \\ \  \ \  \ \  \___|\ \  \ \  \ \  \\\  \ \  \____  
 ##     \ \_______\ \__\\ _\\ \__\ \__\ \__\    \ \__\ \__\ \_____  \ \_______\
 ##      \|_______|\|__|\|__|\|__|\|__|\|__|     \|__|\|__|\|___| \__\|_______|
-##                                                              \|__|         
+##                                                              \|__|                                                                          
 ##  --
-##  RPECK 07/06/2026 - Shopify GraphQL Interactor Node
-##  Provides a data-driven GraphQL execution vector for workflow engines.
+##  RPECK 20/06/2026 - HasGraphQLRepresentation Concern
+##  Provides a robust DSL for defining unified API endpoints and query schemas.
 ################################################################
 ################################################################
 # :startdoc:
@@ -42,18 +42,16 @@ module XEngine
         # selection blocks for the active model class structure.
         #
         # === Parameters
-        # * +single+ [+String+/+Symbol+] - Target resource query name for single-node lookups (e.g., +:product+).
-        # * +multiple+ [+String+/+Symbol+] - Target resource query name for index list or bulk lookups (e.g., +:products+).
-        # * +default_filter+ [+String+] - An optional default Shopify search filter string (e.g., +"status:active"+). Defaults to nil.
-        # * +block+ [+Proc+] - A required block returning a formatted multiline GraphQL field string template.
+        # * +single+ [+String+/+Symbol+] - Optional single entry point (e.g., +:product+).
+        # * +multiple+ [+String+/+Symbol+] - Optional list entry point (e.g., +:products+).
+        # * +default_filter+ [+String+] - Optional default scope filter.
+        # * +block+ [+Proc+] - Required block returning the field tree string.
         #
-        # @raise [ArgumentError] If single, multiple parameters, or an evaluation block are absent.
-        # @return [void]
-        def expose_graphql(single:, multiple:, default_filter: nil, &block)
+        def expose_graphql(single: nil, multiple: nil, default_filter: nil, &block)
           raise ArgumentError, "A configuration block containing fields must be provided" unless block_given?
 
-          self._graphql_single_endpoint = single.to_s
-          self._graphql_multiple_endpoint = multiple.to_s
+          self._graphql_single_endpoint = single&.to_s
+          self._graphql_multiple_endpoint = multiple&.to_s
           self._graphql_default_filter = default_filter
           self._graphql_query_block = block
         end
@@ -77,17 +75,6 @@ module XEngine
           return "" unless _graphql_query_block
 
           _graphql_query_block.call.strip
-        end
-
-        # Returns the raw selection field block for safe nested interpolation inside other queries.
-        # Handles string cleaning to avoid trailing carriage return line issues.
-        #
-        # === Example
-        #   XEngine::Shopify::Collection.graphql_fragment
-        #
-        # @return [String]
-        def graphql_fragment
-          graphql_query
         end
       end
     end

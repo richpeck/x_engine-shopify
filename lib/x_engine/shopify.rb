@@ -36,6 +36,10 @@ module XEngine
     LOADER = Zeitwerk::Loader.for_gem_extension(XEngine).tap do |loader|
       # Enforce uppercase acronym conversion rules for terminal CLI boundaries
       loader.inflector.inflect("graphql" => "graphQL")
+
+      # Collapses the internal layout boundaries to expose models and concerns 
+      # directly under the top-level extension module namespace.
+      loader.collapse("#{__dir__}/shopify/models")
       
       # CRITICAL: Bypasses the providers folder so Zeitwerk doesn't mistake 
       # its contents for continuous Ruby constant namespaces.

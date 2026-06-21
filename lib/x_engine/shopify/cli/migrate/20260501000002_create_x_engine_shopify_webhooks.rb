@@ -14,7 +14,6 @@
 ##  Defines the schema for Shopify stores within XEngine.
 ################################################################
 ################################################################
-# :stopdoc:
 
 # = Shopify Webhooks Database Provisioner
 #
@@ -48,7 +47,12 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
   def up 
     create_table table_name, **table_options do |t|
 
-      t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
+      # Define the reference column explicitly as a UUID at the macro level
+      t.belongs_to :shop, 
+                   type: :uuid, 
+                   foreign_key: { to_table: shop_table, on_delete: :cascade }, 
+                   null: false, 
+                   index: true
 
       # Shopify Specifics
       t.string :shopify_id, index: { unique: true }
@@ -73,7 +77,7 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   #
-  # @return [String]
+  # @return [AdaptiveTableString]
   def shop_table
     XEngine::Core::Model.table_name_for(:shopify, :shop)
   end

@@ -14,19 +14,19 @@
 ################################################################
 ################################################################
 
-# = Shopify Product Media Association Join Table Provisioner
+# = Shopify Product Tags Association Join Table Provisioner
 #
 # Generates the relational bridge layout table mapping core products to their
-# respective synchronized rich media assets in a many-to-many topology.
+# respective synchronized tags in a many-to-many topology.
 #
 # == Database Resource Configuration
 # * *Namespace:* +:shopify+
-# * *Resource:* +:products_product_media+
+# * *Resource:* +:products_product_tags+
 #
 class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Database::Migration
 
   # Enforce structural namespacing parameters for the join table layout target
-  set_resource :shopify, :products_product_media
+  set_resource :shopify, :products_product_tags
 
   # Executes schema generation transformations on the target database engine layer.
   #
@@ -42,15 +42,15 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
                    null: false, 
                    foreign_key: { to_table: product_table, on_delete: :cascade }
 
-      # 2. Foreign key pointing to the Product Media table
-      t.references :product_mediuma, 
+      # 2. Foreign key pointing to the Product Tag table
+      t.references :product_tag, 
                    type: :uuid, 
                    null: false, 
-                   foreign_key: { to_table: media_table, on_delete: :cascade }
+                   foreign_key: { to_table: tag_table, on_delete: :cascade }
 
       # 3. Composite index optimizing fast bidirectional lookups
-      t.index [:product_id, :product_media_id], 
-              name: "idx_xe_shopify_prod_media_poly", 
+      t.index [:product_id, :product_tag_id], 
+              name: "idx_xe_shopify_prod_tags_poly", 
               unique: true
     end
   end
@@ -63,10 +63,10 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
     XEngine::Core::Model.table_name_for(:shopify, :product)
   end
 
-  # Resolves the fully namespaced physical table string value for the Media resource.
+  # Resolves the fully namespaced physical table string value for the Tag resource.
   # @return [String]
-  def media_table
-    XEngine::Core::Model.table_name_for(:shopify, :product_media)
+  def tag_table
+    XEngine::Core::Model.table_name_for(:shopify, :product_tag)
   end
 
 end

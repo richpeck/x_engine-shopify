@@ -46,7 +46,7 @@ module XEngine
 
       # Points directly to the shared secure authentication matrix table inside the Core gem block.
       belongs_to :credential,
-                 class_name: "XEngine::Core::Models::Credential",
+                 class_name: "XEngine::Core::Credential",
                  foreign_key: :credential_id,
                  inverse_of: false
 
