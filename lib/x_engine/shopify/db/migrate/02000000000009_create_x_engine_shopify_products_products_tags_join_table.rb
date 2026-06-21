@@ -37,8 +37,9 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
 
     create_table table_name, **localized_options do |t|
       # 1. Foreign key pointing to the primary Product table
+      # CRITICAL FIX: Cast to :bigint to match the Shopify numeric GID primary key
       t.references :product, 
-                   type: :uuid, 
+                   type: :bigint, 
                    null: false, 
                    foreign_key: { to_table: product_table, on_delete: :cascade }
 
@@ -50,7 +51,7 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
 
       # 3. Composite index optimizing fast bidirectional lookups
       t.index [:product_id, :product_tag_id], 
-              name: "idx_xe_shopify_prod_tags_poly", 
+              name: "idx_xe_shopify_prod_tags_assoc", 
               unique: true
     end
   end
