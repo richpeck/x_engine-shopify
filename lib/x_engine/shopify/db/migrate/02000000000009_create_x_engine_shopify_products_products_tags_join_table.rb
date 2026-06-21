@@ -67,7 +67,7 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
   # Resolves the fully namespaced physical table string value for the Tag resource.
   # @return [String]
   def tag_table
-    XEngine::Core::Model.table_name_for(:shopify, :product_tag)
+    XEngine::Core::Model.table_name_for(:shopify, :tag)
   end
 
 end
