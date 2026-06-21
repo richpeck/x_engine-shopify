@@ -27,29 +27,19 @@ module XEngine
     # == Lifecycle Integration
     # This resource automatically includes the {XEngine::Shopify::HasHandle} concern
     # to guarantee consistent string normalization for SEO-friendly routing handles.
-    # It leverages {XEngine::Shopify::HasGraphQLRepresentation} strictly to state its 
-    # field footprint string definitions when embedded inside upstream parent queries.
     #
     class Tag < XEngine::Core::Model
       include XEngine::Shopify::HasHandle
-      include XEngine::Shopify::HasGraphQLRepresentation
 
       # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :product_tag
+      expose_as :shopify, :tag
 
       # Automatically normalize the title attribute into the handle column before execution
       has_handle :title
 
-      # == GraphQL Layout Declarations
-      # Exposed strictly as a scalar string list representation component.
-      # Shopify returns tags directly on the product node as an array of strings.
-      expose_graphql do
-        <<~GRAPHQL
-          tags
-        GRAPHQL
-      end
-
       # == Associations
+      
+      # Associated products classified under this tag taxonomic category.
       has_and_belongs_to_many :products, -> { distinct }, class_name: "XEngine::Shopify::Product"
 
       # == Validations
