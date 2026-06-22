@@ -10,7 +10,7 @@
 ##      \|____________|\|_______|\|_______|\|__|\|__|\|_______|\|_______|\|__| \|__|\_________\
 ##                                                                                 \|_________|
 ##  --
-##  RPECK 23/04/2026 - Shopify Webhooks Migration
+##  RPECK 23/04/2026 - Shopify Webhook Subscriptions Migration
 ##  Defines the schema for Shopify stores within XEngine.
 ################################################################
 ################################################################
@@ -23,27 +23,30 @@
 #
 # == Database Resource Configuration
 # * *Namespace:* +:shopify+
-# * *Resource:* +:webhook+
+# * *Resource:* +:webhook_subscription+
 #
 # == Schema Layout Matrix
-# [shop_id]            The +uuid+ reference link to the owner store model.
-# [shopify_id]         The unique identification string returned by Shopify's subscription engine.
-# [topic]              The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
-# [filter]             An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
-# [fields]             An array of specific text fields used to limit the dimensions of the incoming data payload.
-# [status]             The current lifecycle operational state of the endpoint registration (Default: <tt>"active"</tt>).
-# [notes]              Text block for logging application exceptions, failure tracing, or system alert states.
+# [+shop_id+]            The +uuid+ reference link to the owner store model.
+# [+shopify_id+]         The unique identification string returned by Shopify's subscription engine.
+# [+topic+]              The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
+# [+filter+]             An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
+# [+fields+]             An optional comma-separated string array restricting dimensions of the incoming resource payload data layer.
+# [+status+]             The current lifecycle operational state of the endpoint registration (Default: <tt>"disabled"</tt>).
+# [+notes+]              Text block for logging application exceptions, failure tracing, or system alert states.
 #
 # == Index Profiles
 # * A composite unique index is assigned across <tt>[:shop_id, :topic]</tt> to prevent duplicate subscription matrices per client tenant.
-class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
+#
+class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migration
 
   # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :webhook
+  set_resource :shopify, :webhook_subscription
 
   # Executes schema generation transformations on the target database engine layer.
   #
-  # @return [void]
+  # === Returns
+  # * +void+
+  #
   def up 
     create_table table_name, **table_options do |t|
 
@@ -77,7 +80,9 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   #
-  # @return [AdaptiveTableString]
+  # === Returns
+  # * +String+:: The exact calculated table string target (e.g., +"xe_shopify_shops"+).
+  #
   def shop_table
     XEngine::Core::Model.table_name_for(:shopify, :shop)
   end

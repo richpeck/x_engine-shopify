@@ -9,8 +9,8 @@
 ##     \ \____________\ \_______\ \_______\ \__\ \__\ \_______\ \_______\ \__\\ \__\
 ##      \|____________|\|_______|\|_______|\|__|\|__|\|_______|\|_______|\|__| \|__|
 ##  --
-##  RPECK 23/04/2026 - WEbhook
-##  Provides the means to interface with the Shopify webhooks system
+##  RPECK 22/06/2026 - Shopify Webhook Subscription Model
+##  Manages multi-tenant event endpoint routing configurations
 ################################################################
 ################################################################
 # :startdoc:

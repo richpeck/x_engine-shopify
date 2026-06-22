@@ -85,15 +85,12 @@ module XEngine
               }
             }
           }
-          metafields {
+          
+          # Modernized nested fragment tracking for company import workflows
+          metafields(first: 250) {
             edges {
               node {
-                __typename
-                id: legacyResourceId
-                namespace
-                key
-                value
-                created_at: createdAt
+                #{XEngine::Shopify::Metafield.graphql_fragment.indent(16)}
               }
             }
           }
