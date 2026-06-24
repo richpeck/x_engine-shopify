@@ -40,7 +40,7 @@ class CreateXEngineShopifyMetafields < XEngine::Core::Database::Migration
 
       # Parent Store Association Scope Boundary
       t.belongs_to :shop, 
-                   type: :bigint, 
+                   type: :uuid, 
                    foreign_key: { to_table: shop_table, on_delete: :cascade }, 
                    null: false
 
