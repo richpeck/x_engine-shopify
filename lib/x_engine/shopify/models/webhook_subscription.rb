@@ -30,7 +30,13 @@ module XEngine
     # Calling #config opens access to high-level system metadata such as the 
     # official GraphQL Enum translation values and core Workflow Engine execution intents.
     #
+    # == Lifecycle Integration
+    # This resource encapsulates its GraphQL representation layouts natively via 
+    # +XEngine::Shopify::HasGraphQLRepresentation+. Handles and identifiers are 
+    # preserved directly from incoming platform payloads.
+    #
     class Webhook < XEngine::Core::Model
+      include XEngine::Shopify::HasGraphQLRepresentation
 
       # ---
       # :section: Serialization Abstractions
@@ -49,6 +55,41 @@ module XEngine
                 identity: :shopify_id,
                 actions: [:read, :create, :update, :destroy],
                 member_actions: { sync: :post }
+
+      # == GraphQL Layout Declarations
+      # Binds endpoints, custom selection fragments, and default pipeline filters.
+      expose_graphql single: :webhook_subscription, multiple: :webhook_subscriptions do
+        <<~GRAPHQL
+          __typename
+          id
+          legacy_id: legacyResourceId
+          topic
+          includeFields
+          created_at: createdAt
+          api_version: apiVersion {
+            displayName 
+            handle
+          }
+          endpoint {
+            __typename
+            ... on WebhookHttpEndpoint {
+              callbackUrl
+            }
+          }
+        GRAPHQL
+      end
+
+      # ---
+      # :section: Enums
+      # ---
+
+      # Map string-backed enums to generate optimized query scopes and performance predicates
+      enum :status, {
+        active:   "active",
+        disabled: "disabled",
+        failing:  "failing"
+      }, default: :disabled
+
       # ---
       # :section: Associations
       # ---
@@ -63,7 +104,7 @@ module XEngine
       # :section: Validations
       # ---
 
-      validates :shop, presence: true
+      validates :shop, :status, presence: true
       
       # Enforce strict multi-tenant isolation boundaries. Only one unique 
       # subscription row can exist per topic on any single storefront instance.
@@ -78,14 +119,6 @@ module XEngine
                   message: ->(_, data) { "'#{data[:value]}' is not a supported target for the engine pipeline infrastructure." }
                 }
 
-      # Status tracking state-machine constraints
-      validates :status, 
-                presence: true, 
-                inclusion: { 
-                  in: %w[active disabled failing], 
-                  message: "%{value} is not a valid operational webhook status state." 
-                }
-
       # ---
       # :section: Instance Methods
       # ---
@@ -93,7 +126,9 @@ module XEngine
       # Resolves the type-safe, dry-struct configuration blueprint instance matching 
       # this record's lowercase wire string topic lookup key.
       #
-      # @return [XEngine::Shopify::Webhooks::Registry::TopicConfig]
+      # === Returns
+      # * +XEngine::Shopify::Webhooks::Registry::TopicConfig+
+      #
       def config
         @config ||= XEngine::Shopify::Webhooks::Registry.find(topic)
       end
@@ -101,7 +136,9 @@ module XEngine
       # Convenience helper delegation pulling the specific target Workflow Engine 
       # pipeline string code directly out of the application registry block.
       #
-      # @return [String] e.g., "models.shopify_webhook.products_update"
+      # === Returns
+      # * +String+:: e.g., +"models.shopify_webhook.products_update"+
+      #
       def workflow_intent
         config&.workflow_intent
       end
@@ -109,7 +146,9 @@ module XEngine
       # Convenience helper delegation pulling the explicit uppercase screaming snake 
       # case string used by the outgoing GraphQL Admin mutation matrix.
       #
-      # @return [String] e.g., "PRODUCTS_UPDATE"
+      # === Returns
+      # * +String+:: e.g., +"PRODUCTS_UPDATE"+
+      #
       def graphql_enum
         config&.graphql_enum
       end
@@ -117,3 +156,4 @@ module XEngine
     end
   end
 end
+# :startdoc:

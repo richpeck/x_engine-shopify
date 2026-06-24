@@ -1,7 +1,7 @@
 # :stopdoc:
 ################################################################
 ################################################################
-##  ________  ___  ___  ___       ___  __             ________  ________  _______   ________  ________  _________  ___  ________  ________      
+##  ________  ___  ___  ___       ___  __              ________  ________  _______   ________  ________  _________  ___  ________  ________      
 ## |\   __  \|\  \|\  \|\  \     |\  \|\  \           |\   __  \|\   __  \|\  ___ \ |\   __  \|\   __  \|\___   ___\\  \|\   __  \|\   ___  \    
 ## \ \  \|\ /\ \  \\\  \ \  \    \ \  \/  /|_         \ \  \|\  \ \  \|\  \ \  \__ /|\ \  \|\ \ \  \|\  \|___ \  \_\ \  \ \  \|\  \ \  \\ \  \   
 ##  \ \   __  \ \  \\\  \ \  \    \ \   ___  \         \ \  \\\  \ \   ____\ \  \_|/_\ \  _  __\ \  .__  \   \ \  \ \ \  \ \  \\\  \ \  \\ \  \  
@@ -29,7 +29,13 @@ module XEngine
     # infrastructure. This model captures execution metadata, file download arrays, and status 
     # loops directly as strings streamed back from Shopify's API.
     #
+    # == Lifecycle Integration
+    # This resource encapsulates its GraphQL representation layouts natively via 
+    # +XEngine::Shopify::HasGraphQLRepresentation+. Polling query configurations 
+    # are declared using the core framework macro layer mapping straight to global nodes.
+    #
     class BulkOperation < XEngine::Core::Model
+      include XEngine::Shopify::HasGraphQLRepresentation
 
       # ---
       # :section: Stackable Configuration
@@ -39,8 +45,28 @@ module XEngine
       expose_as :shopify_bulk_operations,
                 slug: :bulk_operations,
                 identity: :shopify_id,
-                actions: [:read, :create, :destroy], # Swapped :delete to :destroy
+                actions: [:read, :create, :destroy],
                 member_actions: { cancel: :post }
+
+      # == GraphQL Layout Declarations
+      # Binds endpoints, custom selection fragments, and default pipeline filters.
+      # Maps straight to the global node lookup strategy to fetch operations by their graph IDs.
+      expose_graphql single: :node, multiple: :bulk_operations do
+        <<~GRAPHQL
+          __typename
+          id
+          status
+          error_code: errorCode
+          created_at: createdAt
+          completed_at: completedAt
+          object_count: objectCount
+          root_object_count: rootObjectCount
+          file_size: fileSize
+          download_url: url
+          partial_data_url: partialDataUrl
+          query
+        GRAPHQL
+      end
 
       # ---
       # :section: Attribute Accessors
@@ -68,15 +94,6 @@ module XEngine
       validates :shopify_id, presence: true, uniqueness: true
       validates :query, presence: true
 
-      # Forward-compatible validation check guarding state accuracy without relying on strict 
-      # ActiveRecord enum integer mapping constraints.
-      validates :status,
-                presence: true,
-                inclusion: {
-                  in: %w[CREATED RUNNING COMPLETED EXPIRED FAILED CANCELED CANCELING],
-                  message: ->(_, data) { "'#{data[:value]}' is not a recognized Shopify bulk infrastructure status." }
-                }
-
       # ---
       # :section: Instance Methods
       # ---
@@ -84,14 +101,18 @@ module XEngine
       # Helper check confirming if the dataset payload is completely prepped for file processing.
       # Matches the exact screaming snake case string format returned from Shopify's GraphQL gateway.
       #
-      # @return [Boolean]
+      # === Returns
+      # * +Boolean+
+      #
       def ready_for_download?
         status == "COMPLETED" && download_url.present?
       end
 
       # Helper check evaluating whether the background job crashed on Shopify's cluster.
       #
-      # @return [Boolean]
+      # === Returns
+      # * +Boolean+
+      #
       def failed?
         status == "FAILED"
       end
@@ -99,3 +120,4 @@ module XEngine
     end
   end
 end
+# :startdoc:
