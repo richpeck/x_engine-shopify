@@ -53,7 +53,7 @@ class CreateXEngineShopifyWebhookEvents < XEngine::Core::Database::Migration
 
       # Establish explicit internal relation binding to the subscription rule
       t.belongs_to :webhook_subscription,
-                   type: :bigint,
+                   type: :uuid,
                    foreign_key: { to_table: subscription_table, on_delete: :cascade },
                    null: false,
                    index: true
