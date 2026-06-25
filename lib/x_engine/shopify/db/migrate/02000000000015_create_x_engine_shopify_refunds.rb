@@ -44,7 +44,7 @@ class CreateXEngineShopifyRefunds < XEngine::Core::Database::Migration
 
       # Establish explicit internal relation binding to the parent transaction record
       t.belongs_to :order,
-                   type: :bigint,
+                   type: :uuid,
                    foreign_key: { to_table: order_table, on_delete: :cascade },
                    null: false,
                    index: true
