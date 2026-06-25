@@ -40,7 +40,7 @@
 class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migration
 
   # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :webhook_subscription
+  set_resource :shopify, :webhooks
 
   # Executes schema generation transformations on the target database engine layer.
   #
