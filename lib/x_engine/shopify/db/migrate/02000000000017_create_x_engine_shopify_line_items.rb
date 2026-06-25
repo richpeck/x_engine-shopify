@@ -47,7 +47,7 @@ class CreateXEngineShopifyLineItems < XEngine::Core::Database::Migration
 
       # Strict relationship bindings to parent order record
       t.belongs_to :order,
-                   type: :bigint,
+                   type: :uuid,
                    foreign_key: { to_table: order_table, on_delete: :cascade },
                    null: false,
                    index: true
