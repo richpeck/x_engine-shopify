@@ -37,7 +37,7 @@
 # == Index Profiles
 # * A composite unique index is assigned across <tt>[:shop_id, :topic]</tt> to prevent duplicate subscription matrices per client tenant.
 #
-class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migration
+class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
   # Trigger dynamic routing mapping variables for engine table namespaces.
   set_resource :shopify, :webhooks
