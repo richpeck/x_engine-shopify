@@ -31,9 +31,11 @@ require "shopify_api"
 #
 # 1. **Prepare:** Allocates the instance-level +Dry::Configurable+ {XEngine::Shopify::Client} 
 #    dependency, satisfies immediate CLI runtime maps, and registers the client into the container room.
+#    Guarantees that core framework HTTP networking providers are awake before activating.
 # 2. **Start:** Finalizes credentials context for the underlying +ShopifyAPI::Context+ 
 #    using the resolved configuration settings, dynamically injects the engine's data migration 
-#    paths onto the platform's active database component layer, and outputs system telemetry.
+#    paths onto the platform's active database component layer, appends local routing definitions,
+#    and outputs system telemetry.
 #
 Dry::System.register_provider_source(:shopify, group: :x_engine) do
   
@@ -47,14 +49,18 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
     # Force the core CLI component provider to finish initializing its internal maps
     target_container.start(:cli) if target_container.providers.key?(:cli)
 
+    # Guarantee the core HTTP server gateway framework is initialized and available
+    target_container.start(:web) if target_container.providers.key?(:web)
+
     @shopify_client = XEngine::Shopify::Client.new
     register("shopify", @shopify_client)
   end
 
   # Activates the Shopify provider and wires subsystem dependencies.
   #
-  # Synchronizes credentials with the underlying global context wrapper and appends
-  # extension migration files safely onto the engine's active database instance registry.
+  # Synchronizes credentials with the underlying global context wrapper, appends
+  # extension migration files safely onto the engine's active database instance registry,
+  # and evaluates native routing blueprints against the shared web ingress router.
   #
   # @return [void]
   start do
@@ -84,9 +90,18 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
       end
     end
 
+    # == Extension Route Loading Injection
+    # Append local routing definitions directly into the central application tree layer.
+    routes_path = File.expand_path("../shopify/web/routes.rb", __dir__)
+    puts routes_path
+    if File.exist?(routes_path)
+      require routes_path
+    end
+
     # == System Telemetry Output
     if logger
       logger.info("Shopify integration initialized for API version: #{::ShopifyAPI::Context.api_version}")
     end
   end
 end
+# :startdoc:
