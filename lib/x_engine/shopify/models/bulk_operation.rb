@@ -37,17 +37,6 @@ module XEngine
     class BulkOperation < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # ---
-      # :section: Stackable Configuration
-      # ---
-
-      # Decouple internal keys while exposing a clean 'bulk_operations' path
-      expose_as :shopify_bulk_operations,
-                slug: :bulk_operations,
-                identity: :shopify_id,
-                actions: [:read, :create, :destroy],
-                member_actions: { cancel: :post }
-
       # == GraphQL Layout Declarations
       # Binds endpoints, custom selection fragments, and default pipeline filters.
       # Maps straight to the global node lookup strategy to fetch operations by their graph IDs.
@@ -93,29 +82,6 @@ module XEngine
       validates :shop, presence: true
       validates :shopify_id, presence: true, uniqueness: true
       validates :query, presence: true
-
-      # ---
-      # :section: Instance Methods
-      # ---
-
-      # Helper check confirming if the dataset payload is completely prepped for file processing.
-      # Matches the exact screaming snake case string format returned from Shopify's GraphQL gateway.
-      #
-      # === Returns
-      # * +Boolean+
-      #
-      def ready_for_download?
-        status == "COMPLETED" && download_url.present?
-      end
-
-      # Helper check evaluating whether the background job crashed on Shopify's cluster.
-      #
-      # === Returns
-      # * +Boolean+
-      #
-      def failed?
-        status == "FAILED"
-      end
 
     end
   end
