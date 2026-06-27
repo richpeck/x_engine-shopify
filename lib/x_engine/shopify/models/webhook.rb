@@ -45,17 +45,6 @@ module XEngine
       # Handle SQLite3 structural fallback limitations automatically if native array mutations are dropped
       serialize :fields, type: JSON, default: []
 
-      # ---
-      # :section: Stackable Configuration
-      # ---
-
-      # Expose the webhook resource configurations using Shopify's native tracking identifier.
-      expose_as :shopify_webhooks, 
-                slug: :webhooks,
-                identity: :shopify_id,
-                actions: [:read, :create, :update, :destroy],
-                member_actions: { sync: :post }
-
       # == GraphQL Layout Declarations
       # Binds endpoints, custom selection fragments, and default pipeline filters.
       expose_graphql single: :webhook_subscription, multiple: :webhook_subscriptions do

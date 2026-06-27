@@ -29,9 +29,6 @@ module XEngine
     #
     class RefundLineItem < XEngine::Core::Model
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :refund_line_item
-
       # == Associations
       # Explicit relation bounds mapping the line reversion profile to core records
       belongs_to :refund, class_name: "XEngine::Shopify::Refund", inverse_of: :refund_line_items, required: true

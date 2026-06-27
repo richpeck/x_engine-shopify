@@ -29,9 +29,6 @@ module XEngine
     #
     class LineItem < XEngine::Core::Model
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :line_item
-
       # == Associations
       belongs_to :order, class_name: "XEngine::Shopify::Order", inverse_of: :line_items, required: true
       belongs_to :product, class_name: "XEngine::Shopify::Product", inverse_of: :line_items, required: false

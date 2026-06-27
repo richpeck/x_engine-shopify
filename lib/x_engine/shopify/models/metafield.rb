@@ -36,9 +36,6 @@ module XEngine
     class Metafield < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :metafield
-
       # == GraphQL Layout Declarations
       # Populated via standard sync/import jobs; defines the standard subselection payload graph.
       expose_graphql do

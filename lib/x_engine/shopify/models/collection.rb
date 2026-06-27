@@ -34,9 +34,6 @@ module XEngine
       include XEngine::Shopify::HasHandle
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :collection
-
       # Automatically normalize the title attribute into the handle column
       has_handle :title
 

@@ -31,9 +31,6 @@ module XEngine
     class Tag < XEngine::Core::Model
       include XEngine::Shopify::HasHandle
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :tag
-
       # Automatically normalize the title attribute into the handle column before execution
       has_handle :title
 

@@ -47,9 +47,6 @@ module XEngine
     class ProductMedia < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :product_media
-
       # == GraphQL Layout Declarations
       # Exposed strictly as a child query fragment template component. 
       # Handles images, native videos, external embeds, and spatial 3D model assets natively.

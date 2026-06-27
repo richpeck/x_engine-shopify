@@ -34,9 +34,6 @@ module XEngine
     class Product < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :product
-
       # == GraphQL Layout Declarations
       # Binds endpoints, custom selection fragments, and default pipeline filters.
       expose_graphql single: :product, multiple: :products, default_filter: "status:active" do

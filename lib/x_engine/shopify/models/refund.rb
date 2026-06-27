@@ -35,9 +35,6 @@ module XEngine
     class Refund < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :refund
-
       # == GraphQL Layout Declarations
       # Binds endpoints, selection strings, and the default search criteria query 
       # required to discover refunded entities during synchronization sweeps.

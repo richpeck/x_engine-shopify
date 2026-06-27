@@ -28,17 +28,6 @@ module XEngine
     # transactions, and synchronous platform entity data pipelines.
     #
     class Shop < XEngine::Core::Model
-      
-      # ---
-      # :section: Stackable Configuration
-      # ---
-
-      # Target the explicit 'shopify_shops' container key while leaving the route as 'shops'
-      expose_as :shopify_shops, 
-                slug: :shops,
-                identity: :handle,
-                actions: [:read, :update, :destroy],
-                member_actions: { refresh_token: :post }
 
       # ---
       # :section: Associations

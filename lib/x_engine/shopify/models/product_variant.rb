@@ -33,9 +33,6 @@ module XEngine
     class ProductVariant < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # Registers the class context as an active shopify resource entity layer
-      expose_as :shopify, :product_variant
-
       # == GraphQL Layout Declarations
       # Defined strictly as a sub-selection block structure for nested pipeline arrays.
       expose_graphql do
