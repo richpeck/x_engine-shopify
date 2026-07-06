@@ -28,25 +28,20 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
   
   # Prepares the Shopify integration dependencies within the master container.
   #
-  # Ensures prerequisite providers are initialized and mounts the primary config client.
+  # Scans and indexes the internal directory tree for automatic dependency injection
+  # and constructs the client operational interface.
   #
   # @return [void]
   prepare do
-    target_container.start(:cli) if target_container.providers.key?(:cli)
-
-    target_container.start(:web) if target_container.providers.key?(:web)
-
-    require "x_engine/shopify/web/routes"
-
     # 1. Dynamically locate the root directory of this extension gem
-      # (Points to your .../x_engine-shopify/lib path)
-      extension_lib_dir = File.expand_path("../..", __dir__)
+    #    (Points to your .../x_engine-shopify/lib path)
+    extension_lib_dir = File.expand_path("../..", __dir__)
 
-      # 2. Register this directory branch into the master application component scanner
-      target_container.config.component_dirs.add(extension_lib_dir) do |dir|
-        dir.namespaces.add "x_engine", key: nil
-        dir.auto_register = true # Automatically populates and creates container keys
-      end
+    # 2. Register this directory branch into the master application component scanner
+    target_container.config.component_dirs.add(extension_lib_dir) do |dir|
+      dir.namespaces.add "x_engine", key: nil
+      dir.auto_register = true # Automatically populates and creates container keys
+    end
 
     @shopify_client = XEngine::Shopify::Client.new
     register("shopify", @shopify_client)
