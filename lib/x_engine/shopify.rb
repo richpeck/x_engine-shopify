@@ -21,15 +21,21 @@
 require "zeitwerk"
 require "dry/system"
 
-# = XEngine Sidekiq Extension
+# = XEngine Framework Extension Suite
 #
-# Integrates Sidekiq background job processing into the XEngine ecosystem.
-# Coordinates internal autoloader path structures and configures distributed 
-# component provider group matrices.
+# Base namespace governing plugin layers and specialized component providers stacked 
+# atop the core runtime platform.
 #
 module XEngine
+  
+  # = Shopify Extension Layer
+  #
+  # Integrates Shopify API interactions, webhook ingress routers, and synchronized 
+  # e-commerce object mappings seamlessly into the core system graph.
+  #
   module Shopify
-    # Dedicated, high-performance Zeitwerk loader for the Sidekiq gem extension layer.
+    # Dedicated, high-performance Zeitwerk loader managing constant mappings 
+    # for the Shopify gem extension layer.
     # 
     # @return [Zeitwerk::Loader] The active tracking loader instance.
     #
@@ -55,7 +61,7 @@ end
 # Inform the container system that this extension group's external providers are 
 # located inside our isolated local +./providers+ folder.
 #
-# This implicitly maps the file located at <tt>lib/x_engine/providers/sidekiq.rb</tt> 
+# This implicitly maps the file located at <tt>lib/x_engine/providers/shopify.rb</tt> 
 # containing the central +Dry::System.register_provider_source+ configuration schemas.
 #
 Dry::System.register_provider_sources(File.join(__dir__, "providers"))

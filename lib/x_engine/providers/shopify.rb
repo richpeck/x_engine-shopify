@@ -24,58 +24,56 @@ require "shopify_api"
 #
 # Configures, registers, and orchestrates lifecycle operations for the Shopify 
 # API integration within the +XEngine+ master container matrix.
+#
 Dry::System.register_provider_source(:shopify, group: :x_engine) do
-  
-  # Prepares the Shopify integration dependencies within the master container.
+
+  # Prepares the Shopify integration dependencies within the master container environment.
   #
-  # Scans and indexes the internal directory tree for automatic dependency injection
-  # and constructs the client operational interface.
+  # === Lifecycle Operations
+  # 1. Resolves and registers the local database migration directory directly to the orchestrator layer.
+  # 2. Injects the extension gem's library directory paths into the main application's component scanner.
+  # 3. Aliases the automatically discovered client component instance to the short +shopify+ key slot.
   #
   # @return [void]
   prepare do
-    # 1. Dynamically locate the root directory of this extension gem
-    #    (Points to your .../x_engine-shopify/lib path)
     extension_lib_dir = File.expand_path("../..", __dir__)
 
-    # 2. Register this directory branch into the master application component scanner
-    target_container.config.component_dirs.add(extension_lib_dir) do |dir|
-      dir.namespaces.add "x_engine", key: nil
-      dir.auto_register = true # Automatically populates and creates container keys
+    # 1. Register the structural migration path belonging to this extension
+    if target_container.providers.key?(:database)
+      migration_path = File.expand_path("x_engine/shopify/db/migrate", extension_lib_dir)
+      target_container["database"].register_migration_path(migration_path)
     end
 
-    @shopify_client = XEngine::Shopify::Client.new
-    register("shopify", @shopify_client)
+    # 2. Let dry-system completely replace Zeitwerk. It will handle the directory 
+    # monitoring and dynamic file resolution by itself.
+    target_container.config.component_dirs.add(extension_lib_dir) do |dir|
+      dir.namespaces.add "x_engine", key: nil
+      dir.auto_register = true
+    end
+
+    # Safely look up the component via the container keys now that the directory is added.
+    register("shopify") { target_container["x_engine.shopify.client"] }
   end
 
-  # Activates the Shopify provider and wires subsystem dependencies.
+  # Activates the Shopify provider context matrix and binds running dependencies.
   #
-  # Synchronizes credentials with the underlying global context wrapper and appends
-  # extension migration files safely onto the engine's active database instance registry.
+  # Resolves the configured container credentials and initializes the underlying global 
+  # +ShopifyAPI::Context+ structures using the active client configurations.
   #
   # @return [void]
   start do
+    client = target_container["shopify"]
     logger = target_container["logger"]
 
     ::ShopifyAPI::Context.setup(
-      api_key: @shopify_client.config.api_key,
-      api_secret_key: @shopify_client.config.api_secret,
-      scope: @shopify_client.config.scopes,
-      is_embedded: true,
-      is_private: false,
-      api_version: @shopify_client.config.api_version
+      api_key:        client.config.api_key,
+      api_secret_key: client.config.api_secret,
+      scope:          client.config.scopes,
+      is_embedded:    true,
+      is_private:     false,
+      api_version:    client.config.api_version
     )
 
-    if target_container.providers.key?(:database)
-      migration_path = File.expand_path("../shopify/db/migrate", __dir__)
-      database_component = target_container["database"]
-      
-      if database_component.respond_to?(:register_migration_path)
-        database_component.register_migration_path(migration_path)
-      end
-    end
-
-    if logger
-      logger.info("Shopify integration initialized for API version: #{::ShopifyAPI::Context.api_version}")
-    end
+    logger&.info("Shopify initialized for version: #{::ShopifyAPI::Context.api_version}")
   end
 end

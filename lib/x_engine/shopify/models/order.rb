@@ -168,13 +168,6 @@ module XEngine
 
       validates :shop, :name, :currency, presence: true
 
-      # ---
-      # :section: Lifecycle Hooks
-      # ---
-
-      before_save ->(order) { order.total_received = order.total_order_value - order.total_refunded_amount }
-      before_save ->(order) { order.fulfillment_status = "pending" if order.fulfillment_status.nil? }
-
     end
   end
 end
