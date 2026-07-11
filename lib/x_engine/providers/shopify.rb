@@ -29,14 +29,14 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
 
   # Prepares the Shopify integration dependencies within the master container environment.
   #
-  # === Lifecycle Operations
-  # 1. Resolves and registers the local database migration directory directly to the orchestrator layer.
-  # 2. Injects the extension gem's library directory paths into the main application's component scanner.
-  # 3. Aliases the automatically discovered client component instance to the short +shopify+ key slot.
+  # This lifecycle phase ensures the local database migration paths are registered
+  # with the engine's database provider and defines the factory for the main 
+  # Shopify client component.
   #
   # @return [void]
   prepare do
-    extension_lib_dir = File.expand_path("../..", __dir__)
+    gem_root            = XEngine::Shopify::ROOT
+    extension_lib_dir   = File.join(gem_root, "lib")
 
     # 1. Register the structural migration path belonging to this extension
     if target_container.providers.key?(:database)
@@ -44,21 +44,18 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
       target_container["database"].register_migration_path(migration_path)
     end
 
-    # 2. Let dry-system completely replace Zeitwerk. It will handle the directory 
-    # monitoring and dynamic file resolution by itself.
-    target_container.config.component_dirs.add(extension_lib_dir) do |dir|
-      dir.namespaces.add "x_engine", key: nil
-      dir.auto_register = true
+    # 2. Register the shopify client factory. 
+    # The client is resolved lazily via XEngine::Shopify::Client, which is 
+    # discovered and autoloaded by the engine's Zeitwerk instance.
+    register("shopify") do
+      XEngine::Shopify::Client.new
     end
-
-    # Safely look up the component via the container keys now that the directory is added.
-    register("shopify") { target_container["x_engine.shopify.client"] }
   end
 
   # Activates the Shopify provider context matrix and binds running dependencies.
   #
-  # Resolves the configured container credentials and initializes the underlying global 
-  # +ShopifyAPI::Context+ structures using the active client configurations.
+  # Initializes the global +ShopifyAPI::Context+ structures by resolving the 
+  # configuration from the registered +shopify+ client component.
   #
   # @return [void]
   start do

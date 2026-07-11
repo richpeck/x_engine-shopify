@@ -18,41 +18,41 @@
 
 # frozen_string_literal: true
 
-require "zeitwerk"
 require "dry/system"
 
 # = XEngine Framework Extension Suite
 #
-# Base namespace governing plugin layers and specialized component providers stacked 
-# atop the core runtime platform.
+# Base namespace governing plugin layers and specialized component providers 
+# stacked atop the core runtime platform.
 #
 module XEngine
-  
+
   # = Shopify Extension Layer
   #
-  # Integrates Shopify API interactions, webhook ingress routers, and synchronized 
-  # e-commerce object mappings seamlessly into the core system graph.
+  # Integrates Shopify API interactions, webhook ingress routers, and 
+  # synchronized e-commerce object mappings seamlessly into the core 
+  # system graph.
   #
   module Shopify
-    # Dedicated, high-performance Zeitwerk loader managing constant mappings 
-    # for the Shopify gem extension layer.
-    # 
-    # @return [Zeitwerk::Loader] The active tracking loader instance.
-    #
-    LOADER = Zeitwerk::Loader.for_gem_extension(XEngine).tap do |loader|
-      # Enforce uppercase acronym conversion rules for terminal CLI boundaries
-      loader.inflector.inflect("graphql" => "graphQL")
 
-      # Collapses the internal layout boundaries to expose models and concerns 
-      # directly under the top-level extension module namespace.
-      loader.collapse("#{__dir__}/shopify/models")
-      
-      # CRITICAL: Bypasses the providers folder so Zeitwerk doesn't mistake 
-      # its contents for continuous Ruby constant namespaces.
-      loader.ignore("#{__dir__}/providers")
-      
-      # Commit changes and establish the tracking system maps
-      loader.setup
+    # Absolute path to the gem's root directory (c:/Dev/Apps/x_engine-shopify)
+    ROOT = File.expand_path("../..", __dir__).freeze
+
+    # Configure the engine container to recognize this extension's directory.
+    # This block executes when the framework application initializes.
+    #
+    # @param app [Dry::System::Container] The host framework container instance.
+    # @return [void]
+    def self.setup(app)
+      app.config.component_dirs.add(File.join(ROOT, "lib")) do |dir|
+        dir.namespaces.add "x_engine", key: nil
+      end
+
+      # Inflect API-specific acronyms for Zeitwerk compatibility
+      app.config.autoloader.inflector.inflect(
+        "graphql" => "GraphQL",
+        "gid"     => "GID"
+      )
     end
   end
 end
@@ -60,14 +60,11 @@ end
 # --- SYSTEM PROVIDER GROUP MATRIX CONFIGURATION ---
 # Inform the container system that this extension group's external providers are 
 # located inside our isolated local +./providers+ folder.
-#
-# This implicitly maps the file located at <tt>lib/x_engine/providers/shopify.rb</tt> 
-# containing the central +Dry::System.register_provider_source+ configuration schemas.
-#
 Dry::System.register_provider_sources(File.join(__dir__, "providers"))
 
 # --- AUTOMATIC APPLICATION ADAPTER BINDING ---
-# Automatically mounts the background processor provider component onto the running 
-# framework master container tree if it has been evaluated into active process memory.
-#
-XEngine::Application.register_provider(:shopify, from: :x_engine) if defined?(XEngine::Application)
+# Bind the provider to the framework application after the environment is ready.
+if defined?(XEngine::Application)
+  XEngine::Shopify.setup(XEngine::Application)
+  XEngine::Application.register_provider(:shopify, from: :x_engine)
+end
