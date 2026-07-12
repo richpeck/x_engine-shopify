@@ -52,9 +52,11 @@ module XEngine
     def self.setup(app)
       # Pushes extension-specific acronyms into the centralized application matrix.
       # These will be compiled safely via Dry::Inflector right before configuration.
-      if app.respond_to?(:register_acronyms)
-        app.register_acronyms("GraphQL", "GID")
-      end
+      app.autoloader.inflector.inflect(
+        "graphql"                    => "GraphQL",
+        "gid"                        => "GID",
+        "has_graphql_representation" => "HasGraphQLRepresentation"
+      )
 
       # Register the extension lib directory for component scanning
       app.config.component_dirs.add(File.join(ROOT, "lib")) do |dir|
