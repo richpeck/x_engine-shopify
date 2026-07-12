@@ -43,7 +43,7 @@ module XEngine
       # ---
 
       # Handle SQLite3 structural fallback limitations automatically if native array mutations are dropped
-      serialize :fields, type: JSON, default: []
+      serialize :fields, coder: JSON, default: []
 
       # == GraphQL Layout Declarations
       # Binds endpoints, custom selection fragments, and default pipeline filters.

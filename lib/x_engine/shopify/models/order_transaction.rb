@@ -32,13 +32,6 @@ module XEngine
     class OrderTransaction < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # ---
-      # :section: Resource Configuration
-      # ---
-
-      # Define the explicit infrastructure table boundaries inside the core schema engine layout.
-      set_resource :shopify, :order_transaction
-
       # == GraphQL Layout Declarations
       # Binds processing categories, gateway states, and financial tracking metrics.
       expose_graphql do

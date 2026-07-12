@@ -36,22 +36,42 @@ module XEngine
   module Shopify
 
     # Absolute path to the gem's root directory (c:/Dev/Apps/x_engine-shopify)
+    # @return [String]
     ROOT = File.expand_path("../..", __dir__).freeze
 
-    # Configure the engine container to recognize this extension's directory.
-    # This block executes when the framework application initializes.
+    # Configures the engine container to recognize this extension's directory,
+    # passes extension-specific acronym rules down to the global accumulation matrix,
+    # and optimizes the autoloader layout.
     #
     # @param app [Dry::System::Container] The host framework container instance.
     # @return [void]
+    #
+    # === Example
+    #   XEngine::Shopify.setup(XEngine::Application)
+    #
     def self.setup(app)
+      # Pushes extension-specific acronyms into the centralized application matrix.
+      # These will be compiled safely via Dry::Inflector right before configuration.
+      if app.respond_to?(:register_acronyms)
+        app.register_acronyms("GraphQL", "GID")
+      end
+
+      # Register the extension lib directory for component scanning
       app.config.component_dirs.add(File.join(ROOT, "lib")) do |dir|
         dir.namespaces.add "x_engine", key: nil
       end
 
-      # Inflect API-specific acronyms for Zeitwerk compatibility
-      app.config.autoloader.inflector.inflect(
-        "graphql" => "GraphQL",
-        "gid"     => "GID"
+      # Exclude internal provider definitions from Zeitwerk's autoloader
+      app.autoloader.ignore(
+        File.join(ROOT, "lib/x_engine/providers"),
+        File.join(ROOT, "lib/x_engine/shopify/version.rb"),
+        File.join(ROOT, "lib/x_engine/shopify/db")
+      )
+
+      # Collapse nested data mapping models into flat namespaces
+      app.autoloader.collapse(
+        File.join(ROOT, "lib/x_engine/shopify/models"),
+        File.join(ROOT, "lib/x_engine/shopify/models/concerns")
       )
     end
   end

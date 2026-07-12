@@ -29,13 +29,6 @@ module XEngine
       include XEngine::Shopify::HasGraphQLRepresentation
 
       # ---
-      # :section: Resource Configuration
-      # ---
-
-      # Define the explicit infrastructure table boundaries inside the core schema engine layout.
-      set_resource :shopify, :order
-
-      # ---
       # :section: GraphQL Layout Declarations
       # ---
 

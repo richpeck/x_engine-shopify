@@ -34,19 +34,12 @@ module XEngine
       include XEngine::Shopify::HasGraphQLRepresentation
 
       # ---
-      # :section: Resource Configuration
-      # ---
-
-      # Define the explicit infrastructure table boundaries inside the core schema engine layout.
-      set_resource :shopify, :fulfillment
-
-      # ---
       # :section: Serialization Abstractions
       # ---
 
       # Handle SQLite3 fallback structural transformations for tracking arrays automatically
-      serialize :tracking_numbers, type: JSON, default: []
-      serialize :tracking_urls,    type: JSON, default: []
+      serialize :tracking_numbers, coder: JSON, default: []
+      serialize :tracking_urls,    coder: JSON, default: []
 
       # == GraphQL Layout Declarations
       # Binds delivery status targets, carrier strings, and shipment tracking fields.
