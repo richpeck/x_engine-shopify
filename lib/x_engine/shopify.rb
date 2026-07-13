@@ -53,15 +53,19 @@ module XEngine
       # Pushes extension-specific acronyms into the centralized application matrix.
       # These will be compiled safely via Dry::Inflector right before configuration.
       app.autoloader.inflector.inflect(
-        "graphql"                    => "GraphQL",
-        "gid"                        => "GID",
-        "has_graphql_representation" => "HasGraphQLRepresentation"
+        "graphql" => "GraphQL",
+        "gid"     => "GID"
+      )
+
+      # Register the various directories required for components
+      app.config.component_dirs.add(
+        File.join(ROOT, "lib", "x_engine", "shopify", "nodes")
       )
 
       # Register the extension lib directory for component scanning
-      app.config.component_dirs.add(File.join(ROOT, "lib")) do |dir|
-        dir.namespaces.add "x_engine", key: nil
-      end
+      app.autoloader.push_dir(
+        File.join(ROOT, "lib")
+      )
 
       # Exclude internal provider definitions from Zeitwerk's autoloader
       app.autoloader.ignore(
