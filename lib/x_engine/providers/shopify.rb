@@ -38,8 +38,11 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
     gem_root            = XEngine::Shopify::ROOT
     extension_lib_dir   = File.join(gem_root, "lib")
 
+    # This invokes the :database provider's prepare and start steps
+    target_container.prepare(:database)
+
     # 1. Register the structural migration path belonging to this extension
-    if target_container.providers.key?(:database)
+    if target_container.registered?(:database)
       migration_path = File.expand_path("x_engine/shopify/db/migrate", extension_lib_dir)
       target_container["database"].register_migration_path(migration_path)
     end
@@ -47,7 +50,7 @@ Dry::System.register_provider_source(:shopify, group: :x_engine) do
     # 2. Register the shopify client factory. 
     # The client is resolved lazily via XEngine::Shopify::Client, which is 
     # discovered and autoloaded by the engine's Zeitwerk instance.
-    register("shopify") do
+    register("shopify", memoize: true) do
       XEngine::Shopify::Client.new
     end
   end
