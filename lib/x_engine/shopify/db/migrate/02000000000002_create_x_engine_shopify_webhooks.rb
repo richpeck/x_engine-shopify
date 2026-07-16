@@ -27,6 +27,7 @@
 #
 # == Schema Layout Matrix
 # [+shop_id+]            The +uuid+ reference link to the owner store model.
+# [+name+]               A human-readable label identifying the registration context.
 # [+shopify_id+]         The unique identification string returned by Shopify's subscription engine.
 # [+topic+]              The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
 # [+filter+]             An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
@@ -56,6 +57,9 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
                    foreign_key: { to_table: shop_table, on_delete: :cascade }, 
                    null: false, 
                    index: true
+
+      # Metadata & Human Interface
+      t.string :name, null: true
 
       # Shopify Specifics
       t.string :shopify_id, index: { unique: true }

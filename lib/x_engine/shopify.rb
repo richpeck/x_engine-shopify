@@ -53,8 +53,9 @@ module XEngine
       # Pushes extension-specific acronyms into the centralized application matrix.
       # These will be compiled safely via Dry::Inflector right before configuration.
       app.autoloader.inflector.inflect(
-        "graphql" => "GraphQL",
-        "gid"     => "GID"
+        "graphql"                    => "GraphQL",
+        "gid"                        => "GID",
+        "has_graphql_representation" => "HasGraphQLRepresentation"
       )
 
       # Register the various directories required for components
