@@ -10,11 +10,13 @@
 ##      \|_______|\|__|\|__|\|_______|\|__|\|__|    \|__|  \|_______|       |\_________\|__|\|__|\|_______|\|__|   
 ##                                                                          \|_________|                           
 ##  --
-##  RPECK 20/07/2026 - Seeds
+##  RPECK 20/07/2026 - Create Shop
 ##  System which allows us to deploy various settings inside the app
 ################################################################
 ################################################################
 # :startdoc:
+
+# frozen_string_literal: true
 
 module XEngine
   module Shopify
@@ -26,8 +28,7 @@ module XEngine
       # store administrative metadata, securely segregates access credentials into a standalone core 
       # security profile, and binds the newly synchronized storefront records in a single execution block.
       #
-      class CreateShop
-        include Dry::Operation
+      class CreateShop < Dry::Operation
 
         # Resolves remote storefront details and registers the shop record locally.
         #

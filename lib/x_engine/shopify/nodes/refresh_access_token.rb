@@ -24,8 +24,7 @@ module XEngine
       # Handles outbound OAuth client credential handshakes to request, rotate, and
       # refresh short-lived background API tokens from Shopify server nodes.
       #
-      class RefreshAccessToken
-        include Dry::Operation
+      class RefreshAccessToken < Dry::Operation
 
         # Executes the OAuth handshake request against the targeted Shopify domain storefront.
         #
