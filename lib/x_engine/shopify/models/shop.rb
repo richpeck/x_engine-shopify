@@ -1,16 +1,16 @@
 # :stopdoc:
 ################################################################
 ################################################################
-##   ________  ___  ___  ________  ________   
-##  |\   ____\|\  \|\  \|\   __  \|\   __  \  
-##  \ \  \___|\ \  \\\  \ \  \|\  \ \  \|\  \ 
-##   \ \_____  \ \   __  \ \  \\\  \ \   ____\
-##    \|____|\  \ \  \ \  \ \  \\\  \ \  \___|
-##      ____\_\  \ \__\ \__\ \_______\ \__\   
-##     |\_________\|__|\|__|\|_______|\|__|   
-##     \|_________|                                                      
-##  --
-##  RPECK 23/04/2026 - Shop
+##   ________  ___  ___  ________  ________  ________      
+##  |\   ____\|\  \|\  \|\   __  \|\   __  \|\   ____\     
+##  \ \  \___|\ \  \\\  \ \  \|\  \ \  \|\  \ \  \___|_    
+##   \ \_____  \ \   __  \ \  \\\  \ \   ____\ \_____  \   
+##    \|____|\  \ \  \ \  \ \  \\\  \ \  \___|\|____|\  \  
+##      ____\_\  \ \__\ \__\ \_______\ \__\       ____\_\  \ 
+##     |\_________\|__|\|__|\|_______|\|__|      |\_________\
+##     \|_________|                              \|_________|
+## --
+##  RPECK 20/07/2026 - Shop
 ##  Model used to manage the shop objects inside the Shopify context
 ################################################################
 ################################################################
@@ -20,7 +20,7 @@
 
 module XEngine
   module Shopify
-    # == Shopify Shop
+    # = Shopify Shop
     #
     # Represents a Shopify Store tenant within the XEngine ecosystem. This model uses the 
     # "handle" (subdomain) as its primary public identity for clean, readable routing, while 
@@ -28,6 +28,37 @@ module XEngine
     # transactions, and synchronous platform entity data pipelines.
     #
     class Shop < XEngine::Core::Model
+      include XEngine::Shopify::HasGraphQLRepresentation
+
+      # == GraphQL Layout Declarations
+      # Binds endpoints, custom selection fragments, and default pipeline filters.
+      expose_graphql single: :shop do
+        <<~GRAPHQL
+          __typename
+          id
+          name
+          description
+          email
+          url
+          currencyCode
+          myshopify_domain: myshopifyDomain
+          created_at:       createdAt
+          billing_address:  billingAddress {
+              address1
+              address2
+              city
+              company
+              country
+              countryCodeV2
+              latitude
+              longitude
+              phone
+              province
+              provinceCode
+              zip
+          }
+        GRAPHQL
+      end
 
       # ---
       # :section: Associations
@@ -60,8 +91,6 @@ module XEngine
       # ---
 
       validates :credential, presence: true
-      validates :access_token, presence: true
-      validates :handle, presence: true, uniqueness: true
       validates :myshopify_domain, presence: true, uniqueness: true
       validates :api_version, presence: true
       
@@ -88,6 +117,16 @@ module XEngine
       # ---
       # :section: Instance Methods
       # ---
+
+      # Evaluates whether the currently stored OAuth token is valid and safe for outbound requests,
+      # ensuring a defensive 5-minute buffer window prior to formal API expiration.
+      #
+      # @return [Boolean]
+      def access_token_valid?
+        client_key.present? && (
+          api_expires.blank? || api_expires > 5.minutes.from_now
+        )
+      end
 
       # Helper profile evaluator confirming whether a targeted webhook topic is natively
       # compatible with this shop's currently locked API core version string context.

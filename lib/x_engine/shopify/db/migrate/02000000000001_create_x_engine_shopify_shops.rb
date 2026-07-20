@@ -63,6 +63,7 @@ class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
       t.string    :email, null: false
       t.string    :url, null: false
       t.string    :currency_code, default: "USD", null: false
+      t.datetime  :api_expires
 
       # Billing Details
       t.string    :billing_address

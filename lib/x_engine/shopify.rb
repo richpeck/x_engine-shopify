@@ -59,9 +59,10 @@ module XEngine
       )
 
       # Register the various directories required for components
-      app.config.component_dirs.add(
-        File.join(ROOT, "lib", "x_engine", "shopify", "nodes")
-      )
+      app.config.component_dirs.add File.join(ROOT, "lib") do |dir|
+        dir.namespaces.add "x_engine", key: nil
+        dir.auto_register = ->(component) { component.identifier.start_with?("shopify.nodes") }
+      end
 
       # Register the extension lib directory for component scanning
       app.autoloader.push_dir(
