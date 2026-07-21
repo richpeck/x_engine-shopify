@@ -16,49 +16,36 @@
 ################################################################
 # :startdoc:
 
+require 'net/http'
+require 'uri'
+require 'json'
+
 module XEngine
   module Shopify
     module Nodes
-      # = Shopify Access Token Refresh Node
-      #
-      # Handles outbound OAuth client credential handshakes to request, rotate, and
-      # refresh short-lived background API tokens from Shopify server nodes.
-      #
-      class RefreshAccessToken < Dry::Operation
-
-        # Executes the OAuth handshake request against the targeted Shopify domain storefront.
-        #
-        # == Parameters:
-        # [myshopify_domain]   The permanent immutable canonical look-up domain (e.g., <tt>"example.myshopify.com"</tt>).
-        # [client_id]          The primary application client public identifier key.
-        # [client_secret]      The application cryptographic secret validation token.
-        #
-        # == Returns:
-        # * <tt>Dry::Monads::Result::Success(Hash)</tt> containing +:access_token+ and absolute +:api_expires+ timestamp.
-        # * <tt>Dry::Monads::Result::Failure(String)</tt> explaining credential errors, handshake failures, or network issues.
-        #
+      class RefreshAccessToken
         def call(myshopify_domain:, client_id:, client_secret:)
-          return Failure("Missing core credentials for token handshake.") if client_id.blank? || client_secret.blank?
-
-          response = Net::HTTP.post(
-            URI("https://#{myshopify_domain}/admin/oauth/access_token"),
-            {
-              client_id: client_id,
-              client_secret: client_secret,
-              grant_type: "client_credentials"
-            }.to_json,
-            { "Content-Type" => "application/json" }
-          )
-
-          return Failure("Shopify Handshake Error: #{response.code}") unless response.is_a?(Net::HTTPSuccess)
-
-          body = JSON.parse(response.body)
-          Success({
-            access_token: body.fetch("access_token"),
-            api_expires: Time.current + body.fetch("expires_in").to_i.seconds
+          uri = URI("https://#{myshopify_domain}/admin/oauth/access_token")
+          
+          # Net::HTTP.post_form handles the x-www-form-urlencoded header automatically
+          response = Net::HTTP.post_form(uri, {
+            client_id: client_id,
+            client_secret: client_secret,
+            grant_type: "client_credentials"
           })
+
+          unless response.is_a?(Net::HTTPSuccess)
+            raise "Shopify returned #{response.code}: #{response.body}"
+          end
+
+          data = JSON.parse(response.body)
+          
+          {
+            access_token: data["access_token"],
+            api_expires: Time.current + data["expires_in"].to_i.seconds
+          }
         rescue => e
-          Failure("Network exception during token rotation: #{e.message}")
+          raise "Handshake failed: #{e.message}"
         end
       end
     end

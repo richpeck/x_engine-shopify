@@ -18,6 +18,8 @@
 
 # frozen_string_literal: true
 
+require 'dry/operation'
+
 module XEngine
   module Shopify
     module Nodes
