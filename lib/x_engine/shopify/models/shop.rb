@@ -20,18 +20,24 @@
 
 module XEngine
   module Shopify
-    # = Shopify Shop
+    # = Shopify Shop Model
     #
-    # Represents a Shopify Store tenant within the XEngine ecosystem. This model uses the 
-    # "handle" (subdomain) as its primary public identity for clean, readable routing, while 
-    # serving as the core cryptographic and multi-tenant parent scoping anchor for webhooks,
-    # transactions, and synchronous platform entity data pipelines.
+    # Represents a Shopify store tenant within the XEngine ecosystem. This model uses the 
+    # canonical +myshopify_domain+ as its primary immutable anchor for routing, while 
+    # serving as the core cryptographic and multi-tenant parent scoping context for webhooks,
+    # product media, transactions, and synchronous platform entity data pipelines.
+    #
+    # == Key Architectural Responsibilities
+    # * *Polymorphic Credential Anchor:* Binds to a polymorphically-owned +XEngine::Core::Credential+ row handling encrypted access tokens.
+    # * *API Client Factory:* Encapsulates thread-isolated session generation and memoized access to REST and GraphQL Admin API clients.
+    # * *GraphQL Hydration Integration:* Declares field mappings consumed by +HasGraphQLRepresentation+ for automated remote metadata synchronization.
     #
     class Shop < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
       # == GraphQL Layout Declarations
-      # Binds endpoints, custom selection fragments, and default pipeline filters.
+      # Binds endpoints, custom selection fragments, and default pipeline filters
+      # utilized during automated GraphQL metadata hydration sweeps.
       expose_graphql single: :shop do
         <<~GRAPHQL
           __typename
@@ -49,14 +55,23 @@ module XEngine
       # :section: Associations
       # ---
 
-      # Points directly to the shared secure authentication matrix table inside the Core gem block.
-      belongs_to :credential,
-                 class_name: "XEngine::Core::Credential",
-                 foreign_key: :credential_id,
-                 inverse_of: false
+      # Polymorphic single-credential association pointing to the shared secure authentication matrix.
+      #
+      # Destroying a shop cascades directly to purge its attached credential record from the core system.
+      #
+      # @return [XEngine::Core::Credential, nil]
+      has_one :credential, 
+              as: :owner, 
+              class_name: "XEngine::Core::Credential", 
+              dependent: :destroy
+
+      # Permits nested assignment during single-pass atomic provisioning operations.
+      accepts_nested_attributes_for :credential
 
       # State-aware webhook endpoint subscriptions registered for this specific storefront.
       # Destroying a shop cascades immediately to purge tracking matrices, mitigating orphan records.
+      #
+      # @return [ActiveRecord::Associations::CollectionProxy<XEngine::Shopify::Webhook>]
       has_many :webhooks,
                class_name: "XEngine::Shopify::Webhook",
                foreign_key: :shop_id,
@@ -64,7 +79,9 @@ module XEngine
                dependent: :destroy
 
       # Consolidated collection of rich asset components (images, videos, and 3D models)
-      # tied directly to this store instance. Orphan records are automatically purged on destruction.
+      # tied directly to this store instance.
+      #
+      # @return [ActiveRecord::Associations::CollectionProxy<XEngine::Shopify::ProductMedia>]
       has_many :product_media,
                class_name: "XEngine::Shopify::ProductMedia",
                foreign_key: :shop_id,
@@ -77,29 +94,32 @@ module XEngine
 
       validates :credential, presence: true
       validates :myshopify_domain, presence: true, uniqueness: true
-      
+
       # Defensive security guard: Assert that the associated credential row is explicitly 
-      # scoped for Shopify operations rather than a mislinked mail server setup.
+      # scoped for Shopify operations rather than a mislinked external provider setup.
       validate :validate_provider_integrity, if: :credential
 
       # ---
       # :section: Cryptographic Key Resolvers
       # ---
 
-      # Extracts the access token / API key out of the secure core JSON matrix.
-      # @return [String, nil]
+      # Extracts the active OAuth access token or legacy API key out of the secure core JSON payload matrix.
+      #
+      # @return [String, nil] The raw unencrypted access token string, or +nil+ if unavailable.
       def access_token
         credential&.get(:access_token) || credential&.get(:api_key)
       end
 
-      # Extracts the application public client identifier key out of the secure core JSON matrix.
-      # @return [String, nil]
+      # Extracts the public client identifier or application API key out of the secure core JSON matrix.
+      #
+      # @return [String, nil] The public client key, or +nil+ if unconfigured.
       def client_key
         credential&.get(:api_key) || credential&.get(:client_key)
       end
 
-      # Extracts the application cryptographic secret validation token out of the secure core JSON matrix.
-      # @return [String, nil]
+      # Extracts the cryptographic client secret validation token out of the secure core JSON matrix.
+      #
+      # @return [String, nil] The shared client secret token, or +nil+ if unconfigured.
       def client_secret
         credential&.get(:api_secret) || credential&.get(:client_secret)
       end
@@ -108,10 +128,10 @@ module XEngine
       # :section: API Client & Session Interface
       # ---
 
-      # Instantiates a clean, thread-isolated API session block for outbound node execution calls
+      # Instantiates a clean, thread-isolated API session block for outbound API execution calls
       # without binding credentials directly to a shared system global state.
       #
-      # @return [ShopifyAPI::Auth::Session]
+      # @return [ShopifyAPI::Auth::Session] Active API authorization session configured with store context.
       def to_shopify_session
         ShopifyAPI::Auth::Session.new(
           shop: myshopify_domain,
@@ -119,20 +139,24 @@ module XEngine
         )
       end
 
-      # Returns an instance-level GraphQL Admin Client initialized for this specific store.
-      # Memoized per model instance to prevent redundant client construction during execution loops.
+      # Returns an instance-level GraphQL Admin API Client initialized for this specific store context.
       #
-      # @return [ShopifyAPI::Clients::Graphql::Admin]
+      # Client construction is memoized per model instance to prevent redundant session initializations
+      # during iterative processing loops.
+      #
+      # @return [ShopifyAPI::Clients::Graphql::Admin] The initialized GraphQL Admin API client instance.
       def graphql_client
         @graphql_client ||= ShopifyAPI::Clients::Graphql::Admin.new(
           session: to_shopify_session
         )
       end
 
-      # Returns an instance-level REST Admin Client initialized for this specific store.
-      # Memoized per model instance to prevent redundant client construction during execution loops.
+      # Returns an instance-level REST Admin API Client initialized for this specific store context.
       #
-      # @return [ShopifyAPI::Clients::Rest::Admin]
+      # Client construction is memoized per model instance to prevent redundant session initializations
+      # during iterative processing loops.
+      #
+      # @return [ShopifyAPI::Clients::Rest::Admin] The initialized REST Admin API client instance.
       def rest_client
         @rest_client ||= ShopifyAPI::Clients::Rest::Admin.new(
           session: to_shopify_session
@@ -140,13 +164,13 @@ module XEngine
       end
 
       # ---
-      # :section: Instance Methods
+      # :section: Instance Helpers
       # ---
 
       # Evaluates whether the currently stored OAuth token is valid and safe for outbound requests,
-      # ensuring a defensive 5-minute buffer window prior to formal API expiration.
+      # enforcing a defensive 5-minute buffer window prior to formal API token expiration.
       #
-      # @return [Boolean]
+      # @return [Boolean] +true+ if the token is present and unexpired; +false+ otherwise.
       def access_token_valid?
         access_token.present? && (
           api_expires.blank? || api_expires > 5.minutes.from_now
@@ -156,20 +180,24 @@ module XEngine
       # Helper profile evaluator confirming whether a targeted webhook topic is natively
       # compatible with this shop's currently locked API core version string context.
       #
-      # @param topic [String] Lowercase wire format token (e.g. "products/update")
-      # @return [Boolean]
+      # @param topic [String] Lowercase wire format token (e.g., <tt>"products/update"</tt>).
+      # @return [Boolean] +true+ if the topic is supported by the designated API version; +false+ otherwise.
       def webhook_compatible?(topic)
         XEngine::Shopify::Webhooks::Registry.compatible?(topic, api_version)
       end
 
       private
 
-      # Defensive multi-tenant mapping safety check
+      # Defensive multi-tenant provider mapping safety check.
+      #
+      # Appends a validation error to +:credential+ if the linked credential record's
+      # +provider_type+ is not strictly set to <tt>"shopify"</tt>.
+      #
       # @return [void]
       def validate_provider_integrity
         return if credential.provider_type == "shopify"
 
-        errors.add(:credential_id, "must link directly to an explicit 'shopify' provider type token container profile.")
+        errors.add(:credential, "must link directly to an explicit 'shopify' provider type token container profile.")
       end
 
     end

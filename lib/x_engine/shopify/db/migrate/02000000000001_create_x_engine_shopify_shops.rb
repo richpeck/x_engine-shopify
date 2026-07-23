@@ -63,14 +63,6 @@ class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
       t.string    :url
       t.string    :currency_code, default: "USD"
       t.datetime  :api_expires
-
-      # Extras & Structural Mappings
-      # UPGRADE: Force type: :uuid to prevent data constraint mismatch errors when referencing core credentials
-      t.references :credential, 
-                   type: :uuid, 
-                   null: false, 
-                   foreign_key: { to_table: credential_table, on_delete: :restrict }, 
-                   index: true
                    
       t.json      :meta, default: {}, null: false
 
@@ -79,14 +71,6 @@ class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
       # Enforce explicit system index parameters tracking primary domain routing keys
       t.index :myshopify_domain, unique: true, name: "idx_xe_shopify_shops_unique_domain"
     end
-  end
-
-  private
-
-  # Resolves the fully namespaced physical table string value for the Core Credential engine target.
-  # @return [String]
-  def credential_table
-    XEngine::Core::Model.table_name_for(:core, :credential)
   end
 
 end
