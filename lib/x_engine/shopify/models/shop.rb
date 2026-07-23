@@ -6,9 +6,9 @@
 ##  \ \  \___|\ \  \\\  \ \  \|\  \ \  \|\  \ \  \___|_    
 ##   \ \_____  \ \   __  \ \  \\\  \ \   ____\ \_____  \   
 ##    \|____|\  \ \  \ \  \ \  \\\  \ \  \___|\|____|\  \  
-##      ____\_\  \ \__\ \__\ \_______\ \__\       ____\_\  \ 
-##     |\_________\|__|\|__|\|_______|\|__|      |\_________\
-##     \|_________|                              \|_________|
+##      ____\_\  \ \__\ \__\ \_______\ \__\     ____\_\  \ 
+##     |\_________\|__|\|__|\|_______|\|__|    |\_________\
+##     \|_________|                            \|_________|
 ## --
 ##  RPECK 20/07/2026 - Shop
 ##  Model used to manage the shop objects inside the Shopify context
@@ -37,26 +37,11 @@ module XEngine
           __typename
           id
           name
-          description
           email
           url
           currencyCode
           myshopify_domain: myshopifyDomain
           created_at:       createdAt
-          billing_address:  billingAddress {
-              address1
-              address2
-              city
-              company
-              country
-              countryCodeV2
-              latitude
-              longitude
-              phone
-              province
-              provinceCode
-              zip
-          }
         GRAPHQL
       end
 
@@ -92,7 +77,6 @@ module XEngine
 
       validates :credential, presence: true
       validates :myshopify_domain, presence: true, uniqueness: true
-      validates :api_version, presence: true
       
       # Defensive security guard: Assert that the associated credential row is explicitly 
       # scoped for Shopify operations rather than a mislinked mail server setup.
@@ -101,7 +85,13 @@ module XEngine
       # ---
       # :section: Cryptographic Key Resolvers
       # ---
-      
+
+      # Extracts the access token / API key out of the secure core JSON matrix.
+      # @return [String, nil]
+      def access_token
+        credential&.get(:access_token) || credential&.get(:api_key)
+      end
+
       # Extracts the application public client identifier key out of the secure core JSON matrix.
       # @return [String, nil]
       def client_key
@@ -115,6 +105,41 @@ module XEngine
       end
 
       # ---
+      # :section: API Client & Session Interface
+      # ---
+
+      # Instantiates a clean, thread-isolated API session block for outbound node execution calls
+      # without binding credentials directly to a shared system global state.
+      #
+      # @return [ShopifyAPI::Auth::Session]
+      def to_shopify_session
+        ShopifyAPI::Auth::Session.new(
+          shop: myshopify_domain,
+          access_token: access_token
+        )
+      end
+
+      # Returns an instance-level GraphQL Admin Client initialized for this specific store.
+      # Memoized per model instance to prevent redundant client construction during execution loops.
+      #
+      # @return [ShopifyAPI::Clients::Graphql::Admin]
+      def graphql_client
+        @graphql_client ||= ShopifyAPI::Clients::Graphql::Admin.new(
+          session: to_shopify_session
+        )
+      end
+
+      # Returns an instance-level REST Admin Client initialized for this specific store.
+      # Memoized per model instance to prevent redundant client construction during execution loops.
+      #
+      # @return [ShopifyAPI::Clients::Rest::Admin]
+      def rest_client
+        @rest_client ||= ShopifyAPI::Clients::Rest::Admin.new(
+          session: to_shopify_session
+        )
+      end
+
+      # ---
       # :section: Instance Methods
       # ---
 
@@ -123,7 +148,7 @@ module XEngine
       #
       # @return [Boolean]
       def access_token_valid?
-        client_key.present? && (
+        access_token.present? && (
           api_expires.blank? || api_expires > 5.minutes.from_now
         )
       end
@@ -135,17 +160,6 @@ module XEngine
       # @return [Boolean]
       def webhook_compatible?(topic)
         XEngine::Shopify::Webhooks::Registry.compatible?(topic, api_version)
-      end
-
-      # Instantiates a clean, thread-isolated API session block for outbound node execution calls
-      # without binding credentials directly to a shared system global state.
-      #
-      # @return [ShopifyAPI::Auth::Session]
-      def to_shopify_session
-        ShopifyAPI::Auth::Session.new(
-          shop: myshopify_domain,
-          access_token: access_token
-        )
       end
 
       private
@@ -161,4 +175,3 @@ module XEngine
     end
   end
 end
-# :startdoc:

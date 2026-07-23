@@ -57,21 +57,12 @@ class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
   # @return [void]
   def up 
     create_table table_name, **table_options do |t|
-      t.string    :api_version, null: false, default: "2026-04"
       t.string    :name
       t.string    :myshopify_domain, null: false
-      t.string    :email, null: false
-      t.string    :url, null: false
-      t.string    :currency_code, default: "USD", null: false
+      t.string    :email
+      t.string    :url
+      t.string    :currency_code, default: "USD"
       t.datetime  :api_expires
-
-      # Billing Details
-      t.string    :billing_address
-      t.string    :billing_city
-      t.string    :billing_company
-      t.string    :billing_country
-      t.string    :billing_zip
-      t.string    :billing_phone
 
       # Extras & Structural Mappings
       # UPGRADE: Force type: :uuid to prevent data constraint mismatch errors when referencing core credentials
