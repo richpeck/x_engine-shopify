@@ -44,6 +44,7 @@ module XEngine
           position
           price
           sku
+          barcode
           inventory_policy: inventoryPolicy
           inventory_quantity: inventoryQuantity
           image {

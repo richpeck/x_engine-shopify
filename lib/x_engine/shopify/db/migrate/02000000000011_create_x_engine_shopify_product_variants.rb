@@ -67,6 +67,7 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
       # Variant Identification Parameters
       t.string  :title, null: false
       t.string  :sku
+      t.string  :barcode
       t.integer :position, default: 0
 
       # Pricing & Cost Sizing Metrics

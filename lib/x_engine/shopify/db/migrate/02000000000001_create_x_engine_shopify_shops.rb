@@ -27,22 +27,12 @@
 #
 # == Schema Layout Matrix
 # [id]                System-managed unique primary key handling tenant routing safely using a native +UUID+ format.
-# [api_version]       The standard targeted lock-step Shopify API version string (e.g., <tt>"2026-04"</tt>).
 # [name]              The friendly visual display moniker assigned to the store by the merchant.
 # [myshopify_domain]  The permanent immutable canonical look-up domain (e.g., <tt>"example.myshopify.com"</tt>).
 # [email]             The primary system communication address tracking store alerts.
 # [url]               The active external custom storefront web layout address.
 # [currency_code]     The standard ISO 4217 three-letter banking token (Default: <tt>"USD"</tt>).
-# [credential_id]     Foreign key reference pointing to platform app credential tables containing OAuth parameters.
 # [meta]              A schema-less JSON block handling open context parameters or flags.
-#
-# === Billing Elements
-# [billing_address]   The street-level location details handling financial transactions.
-# [billing_city]      The target municipal zone tracking tax or billing processing.
-# [billing_company]   The legal corporate entity profile registered by the vendor client.
-# [billing_country]   The country code mapping destination boundaries.
-# [billing_zip]       The postal code footprint associated with the merchant card on file.
-# [billing_phone]     The absolute dial string routing to corporate headquarters.
 #
 # == Architectural Guardrails
 # * *Strict Domain Segregation:* Enforces a database-level distinct unique token index check on the <tt>myshopify_domain</tt> value row to guarantee secure workspace separation.
