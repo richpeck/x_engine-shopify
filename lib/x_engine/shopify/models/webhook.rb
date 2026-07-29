@@ -22,36 +22,66 @@ module XEngine
     # = Shopify Webhook Model
     #
     # Represents a state-aware webhook endpoint subscription profile mapped 
-    # to a distinct parent Shopify Store tenant.
+    # to a distinct parent Shopify Store tenant (+XEngine::Shopify::Shop+).
+    #
+    # == Architecture & Responsibilities
+    # This model acts as a lightweight ActiveRecord persistence layer for webhook states.
+    # Remote network synchronization (GraphQL subscriptions and cleanup) is handled 
+    # explicitly by reconciliation operations (e.g., +XInventory::Operations::Shopify::SyncWebhooks+).
     #
     # == Registry Decoration
-    # This model bridges relational database states with immutable structural 
-    # capabilities defined inside the +XEngine::Shopify::Webhooks::Registry+ class.
-    # Calling #config opens access to high-level system metadata such as the 
-    # official GraphQL Enum translation values and core Workflow Engine execution intents.
+    # Bridges database records with immutable registry metadata defined in
+    # +XEngine::Shopify::Webhooks::Registry+. Access metadata via +#config+, 
+    # +#workflow_intent+, or +#graphql_enum+.
     #
-    # == Lifecycle Integration
-    # This resource encapsulates its GraphQL representation layouts natively via 
-    # +XEngine::Shopify::HasGraphQLRepresentation+. Handles and identifiers are 
-    # preserved directly from incoming platform payloads.
+    # == Status Management
+    # Managed via standard ActiveRecord enum:
+    # * +disabled+ (Initial State): Unsubscribed locally or removed from remote platform.
+    # * +active+: Remote Shopify subscription active and verified.
+    # * +failing+: Synchronization error or delivery exception recorded.
+    #
+    # == Database Schema
+    # Matches +shopify_webhooks+ table layout:
+    # * +id+ [+String+] - Primary key (UUID/String identifier).
+    # * +shop_id+ [+String+] - Foreign key to +XEngine::Shopify::Shop+.
+    # * +shopify_id+ [+String+] - Remote Shopify Webhook Subscription GID.
+    # * +topic+ [+String+] - Lowercase wire topic identifier (e.g., +"products/update"+).
+    # * +status+ [+String+] - Current state (+disabled+, +active+, +failing+). Default: +"disabled"+.
+    # * +fields+ [+String+] - Serialized JSON array of targeted GraphQL selection fields.
+    # * +filter+ [+String+] - Optional Shopify query filter string.
+    # * +name+ [+String+] - Human-readable label for configuration displays.
+    # * +notes+ [+Text+] - Logging buffer for runtime errors, warnings, or audit records.
     #
     class Webhook < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
       # ---
-      # :section: Serialization Abstractions
+      # :section: Status Enum
       # ---
 
-      # Handle SQLite3 structural fallback limitations automatically if native array mutations are dropped
+      enum :status, {
+        disabled: "disabled",
+        active:   "active",
+        failing:  "failing"
+      }, default: "disabled"
+
+      # ---
+      # :section: Serialization
+      # ---
+
+      # Handles JSON array encoding for SQLite3/PostgreSQL string column compatibility
       serialize :fields, coder: JSON, default: []
 
-      # == GraphQL Layout Declarations
-      # Binds endpoints, custom selection fragments, and default pipeline filters.
+      # ---
+      # :section: GraphQL Serialization Layouts
+      # ---
+
       expose_graphql single: :webhook_subscription, multiple: :webhook_subscriptions do
         <<~GRAPHQL
           __typename
           id
           legacy_id: legacyResourceId
+          name
           topic
           includeFields
           created_at: createdAt
@@ -69,21 +99,11 @@ module XEngine
       end
 
       # ---
-      # :section: Enums
-      # ---
-
-      # Map string-backed enums to generate optimized query scopes and performance predicates
-      enum :status, {
-        active:   "active",
-        disabled: "disabled",
-        failing:  "failing"
-      }, default: :disabled
-
-      # ---
       # :section: Associations
       # ---
-      
-      # The parent store tenant owning this webhook subscription configuration.
+
+      # @!attribute [rw] shop
+      #   @return [XEngine::Shopify::Shop] Parent store tenant owning this webhook.
       belongs_to :shop, 
                  foreign_key: :shop_id, 
                  class_name: "XEngine::Shopify::Shop", 
@@ -94,9 +114,12 @@ module XEngine
       # ---
 
       validates :shop, :status, presence: true
-      
-      # Enforce strict multi-tenant isolation boundaries. Only one unique 
-      # subscription row can exist per topic on any single storefront instance.
+
+      # Enforce unique remote Shopify GIDs across all database webhooks when present
+      validates :shopify_id, 
+                uniqueness: { allow_nil: true, message: "must be unique across all webhooks." }
+
+      # Multi-tenant isolation: Only one unique subscription per topic per shop instance
       validates :topic, 
                 presence: true, 
                 uniqueness: { 
@@ -109,39 +132,24 @@ module XEngine
                 }
 
       # ---
+      # :section: Registry Delegations
+      # ---
+
+      # Delegates registry properties directly to the underlying topic configuration object.
+      delegate :workflow_intent, :graphql_enum, to: :config, allow_nil: true
+
+      # ---
       # :section: Instance Methods
       # ---
 
-      # Resolves the type-safe, dry-struct configuration blueprint instance matching 
-      # this record's lowercase wire string topic lookup key.
+      # Resolves the type-safe configuration blueprint matching this record's topic.
       #
       # === Returns
-      # * +XEngine::Shopify::Webhooks::Registry::TopicConfig+
+      # * +XEngine::Shopify::Webhooks::Registry::TopicConfig+ or +nil+
       #
       def config
         @config ||= XEngine::Shopify::Webhooks::Registry.find(topic)
       end
-
-      # Convenience helper delegation pulling the specific target Workflow Engine 
-      # pipeline string code directly out of the application registry block.
-      #
-      # === Returns
-      # * +String+:: e.g., +"models.shopify_webhook.products_update"+
-      #
-      def workflow_intent
-        config&.workflow_intent
-      end
-
-      # Convenience helper delegation pulling the explicit uppercase screaming snake 
-      # case string used by the outgoing GraphQL Admin mutation matrix.
-      #
-      # === Returns
-      # * +String+:: e.g., +"PRODUCTS_UPDATE"+
-      #
-      def graphql_enum
-        config&.graphql_enum
-      end
-
     end
   end
 end

@@ -38,6 +38,7 @@ module XEngine
     #   XEngine::Application["shopify"].config do |config|
     #     config.api_key    = "shppa_xyz123..."
     #     config.api_secret = "shpss_abc456..."
+    #     config.app_domain = "https://app.example.com"
     #     config.scopes     = ["read_products", "write_inventory", "read_orders"]
     #   end
     #
@@ -49,12 +50,18 @@ module XEngine
       # @!attribute [rw] api_key
       # The primary API Key generated via the Shopify Partner App Dashboard.
       # @return [String, nil]
-      setting :api_key, default: ENV.fetch("XENGINE_SHOPIFY_API_KEY", 'NO_KEY')
+      setting :api_key, default: ENV.fetch("XENGINE_SHOPIFY_API_KEY", "NO_KEY")
 
       # @!attribute [rw] api_secret
       # The primary Client Secret used to authenticate server-side OAuth handshakes.
       # @return [String, nil]
-      setting :api_secret, default: ENV.fetch("XENGINE_SHOPIFY_API_SECRET", 'NO_SECRET')
+      setting :api_secret, default: ENV.fetch("XENGINE_SHOPIFY_API_SECRET", "NO_SECRET")
+
+      # @!attribute [rw] app_domain
+      # The fully qualified domain/host of this application (e.g. "https://app.yourdomain.com").
+      # Used to construct OAuth redirect URIs, app proxies, and webhook callback endpoints.
+      # @return [String, nil]
+      setting :app_domain, default: ENV.fetch("XENGINE_SHOPIFY_APP_DOMAIN", nil)
 
       # @!attribute [rw] scopes
       # Authorized operational access metrics. Pass a comma-separated string 
@@ -66,7 +73,7 @@ module XEngine
 
       # @!attribute [rw] api_version
       # Targeted Shopify Web API stability version roadmap window.
-      # Defaults to <tt>"2026-04</tt>.
+      # Defaults to <tt>"2026-04"</tt>.
       # @return [String]
       setting :api_version, default: ENV.fetch("XENGINE_SHOPIFY_API_VERSION", "2026-04")
 
@@ -87,9 +94,20 @@ module XEngine
 
       # Validates whether the necessary authentication keys are physically present on disk or environment.
       #
-      # @return [Boolean] True if both +api_key+ and +api_secret+ values are un-assigned or non-nil.
+      # @return [Boolean] True if both +api_key+ and +api_secret+ values are assigned and valid.
       def configured?
-        !config.api_key.nil? && !config.api_secret.nil?
+        config.api_key.present? && config.api_key != "NO_KEY" &&
+          config.api_secret.present? && config.api_secret != "NO_SECRET"
+      end
+
+      # Convenience helper to form fully-qualified webhook callback URLs or endpoint URIs.
+      #
+      # @param path [String] Relative path for the callback target.
+      # @return [String]
+      def callback_url_for(path)
+        base = config.app_domain.to_s.chomp("/")
+        path = "/#{path.to_s.sub(%r{^/}, '')}"
+        "#{base}#{path}"
       end
 
       # Creates an authenticated Shopify transient user or app session context.
@@ -102,6 +120,8 @@ module XEngine
       #
       # @return [ShopifyAPI::Auth::Session] An authenticated session boundary.
       def transient_session(shop:, token:)
+        raise ArgumentError, "Shop domain required for transient session" if shop.blank?
+
         ::ShopifyAPI::Auth::Session.new(
           shop: shop,
           access_token: token
