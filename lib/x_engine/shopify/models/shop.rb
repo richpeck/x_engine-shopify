@@ -68,6 +68,10 @@ module XEngine
       # Permits nested assignment during single-pass atomic provisioning operations.
       accepts_nested_attributes_for :credential
 
+      # Expose underlying credential data properties directly on the model via store_accessor.
+      delegate :access_token, :client_id, :client_secret,
+                    to: :credential, allow_nil: true
+
       # State-aware webhook endpoint subscriptions registered for this specific storefront.
       # Destroying a shop cascades immediately to purge tracking matrices, mitigating orphan records.
       #
@@ -98,31 +102,6 @@ module XEngine
       # Defensive security guard: Assert that the associated credential row is explicitly 
       # scoped for Shopify operations rather than a mislinked external provider setup.
       validate :validate_provider_integrity, if: :credential
-
-      # ---
-      # :section: Cryptographic Key Resolvers
-      # ---
-
-      # Extracts the active OAuth access token or legacy API key out of the secure core JSON payload matrix.
-      #
-      # @return [String, nil] The raw unencrypted access token string, or +nil+ if unavailable.
-      def access_token
-        credential&.get(:access_token) || credential&.get(:api_key)
-      end
-
-      # Extracts the public client identifier or application API key out of the secure core JSON matrix.
-      #
-      # @return [String, nil] The public client key, or +nil+ if unconfigured.
-      def client_key
-        credential&.get(:api_key) || credential&.get(:client_key)
-      end
-
-      # Extracts the cryptographic client secret validation token out of the secure core JSON matrix.
-      #
-      # @return [String, nil] The shared client secret token, or +nil+ if unconfigured.
-      def client_secret
-        credential&.get(:api_secret) || credential&.get(:client_secret)
-      end
 
       # ---
       # :section: API Client & Session Interface
