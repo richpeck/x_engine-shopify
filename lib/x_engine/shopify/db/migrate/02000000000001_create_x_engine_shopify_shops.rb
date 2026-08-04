@@ -14,38 +14,35 @@
 ##  Defines the schema for Shopify stores within XEngine.
 ################################################################
 ################################################################
+# :startdoc:
+
+# frozen_string_literal: true
 
 # = Shopify Shops Database Provisioner
 #
 # Generates the multi-tenant tracking schema required to anchor individual
-# Shopify merchant environments within the platform core. This profile retains
+# Shopify merchant environments within the platform core (+XEngine::Shopify::Shop+). This profile retains
 # core operational metadata, contextual billing geometries, and security linkages.
 #
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:shop+
-#
 # == Schema Layout Matrix
-# [id]                System-managed unique primary key handling tenant routing safely using a native +UUID+ format.
-# [name]              The friendly visual display moniker assigned to the store by the merchant.
-# [myshopify_domain]  The permanent immutable canonical look-up domain (e.g., <tt>"example.myshopify.com"</tt>).
-# [email]             The primary system communication address tracking store alerts.
-# [url]               The active external custom storefront web layout address.
-# [currency_code]     The standard ISO 4217 three-letter banking token (Default: <tt>"USD"</tt>).
-# [meta]              A schema-less JSON block handling open context parameters or flags.
+# [id]               System-managed unique primary key handling tenant routing safely using a native +UUID+ format.
+# [name]             The friendly visual display moniker assigned to the store by the merchant.
+# [myshopify_domain] The permanent immutable canonical look-up domain (e.g., <tt>"example.myshopify.com"</tt>).
+# [email]            The primary system communication address tracking store alerts.
+# [url]              The active external custom storefront web layout address.
+# [currency_code]    The standard ISO 4217 three-letter banking token (Default: <tt>"USD"</tt>).
+# [meta]             A schema-less JSON block handling open context parameters or flags.
 #
 # == Architectural Guardrails
 # * *Strict Domain Segregation:* Enforces a database-level distinct unique token index check on the <tt>myshopify_domain</tt> value row to guarantee secure workspace separation.
-# * *Aligned BigInt Mappings:* Overrides reference typing on the <tt>credential_id</tt> block to bind correctly with structural core authorization math indexes.
+#
 class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
-
-  # Dynamically set resource for table naming logic
-  set_resource :shopify, :shop
 
   # Executes schema generation transformations on the target database engine layer.
   #
   # @return [void]
   def up 
+
     create_table table_name, **table_options do |t|
       t.string    :name
       t.string    :myshopify_domain, null: false
@@ -63,5 +60,13 @@ class CreateXEngineShopifyShops < XEngine::Core::Database::Migration
     end
   end
 
+  private
+
+  # Resolves the database target table directly from the Shop model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Shop.table_name
+  end
+
 end
-# :startdoc:

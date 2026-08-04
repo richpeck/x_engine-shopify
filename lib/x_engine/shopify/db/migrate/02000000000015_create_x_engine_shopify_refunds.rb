@@ -15,30 +15,25 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Create Shopify Refunds Database Provisioner
 #
 # Implements the structural physical data layout for tracking financial order 
-# rollbacks mapped down from the external Shopify platform environment.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:refund+
+# rollbacks mapped down from the external Shopify platform environment (+XEngine::Shopify::Refund+).
 #
 # == Schema Layout Matrix
-# [+order_id+]  The foreign reference link binding the transaction rollback to its parent order record.
-# [+note+]      Text area capturing the operational reason given for the financial reversion.
-# [+value+]     The precision-bound monetary decimal value returned to the customer.
+# [order_id]   The foreign reference link binding the transaction rollback to its parent order record.
+# [note]       Text area capturing the operational reason given for the financial reversion.
+# [value]      The precision-bound monetary decimal value returned to the customer.
+# [created_at] Standard ActiveRecord timestamp.
+# [updated_at] Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyRefunds < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :refund
-
   # Executes schema generation transformations on the target database engine layer.
   #
-  # === Returns
-  # * +void+
-  #
+  # @return [void]
   def up
     create_table table_name, **table_options do |t|
 
@@ -59,14 +54,18 @@ class CreateXEngineShopifyRefunds < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the Refund model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Refund.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Order+ resource.
   #
-  # === Returns
-  # * +String+:: The exact calculated table string target (e.g., +"x_engine_shopify_orders"+).
-  #
+  # @return [String]
   def order_table
-    XEngine::Core::Model.table_name_for(:shopify, :order)
+    @order_table ||= XEngine::Shopify::Order.table_name
   end
 
 end
-# :startdoc:

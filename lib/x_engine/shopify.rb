@@ -39,6 +39,29 @@ module XEngine
     # @return [String]
     ROOT = File.expand_path("../..", __dir__).freeze
 
+    # Defines the localized database table name prefix for models nested inside
+    # the +XEngine::Shopify+ namespace.
+    #
+    # === ActiveRecord Namespace Inheritance
+    # When ActiveRecord resolves table names for nested models (e.g. +XEngine::Shopify::Shop+),
+    # it traverses +module_parents+ from root to leaf (+[XEngine, XEngine::Shopify]+) and 
+    # concatenates all returned +table_name_prefix+ strings in sequence.
+    #
+    # * Parent (+XEngine.table_name_prefix+): +"xe_"+
+    # * Child (+XEngine::Shopify.table_name_prefix+): +"shopify_"+
+    # * Combined Prefix: +"xe_shopify_"+
+    # * Target Table Name: +"xe_shopify_shops"+
+    #
+    # Do NOT include parent prefixes (e.g. +"xe_"+) inside this method string,
+    # as ActiveRecord will prepend parent module prefixes automatically during hierarchy traversal.
+    #
+    # === Returns
+    # * +String+ - The module-specific suffix prefix ("shopify_").
+    #
+    def self.table_name_prefix
+      "shopify_"
+    end
+
     # Configures the engine container to recognize this extension's directory,
     # passes extension-specific acronym rules down to the global accumulation matrix,
     # and optimizes the autoloader layout.

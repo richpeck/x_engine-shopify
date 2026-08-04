@@ -14,6 +14,8 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Product Media Association Join Table Provisioner
 #
 # Generates the relational bridge table mapping shopify product models to their
@@ -24,16 +26,10 @@
 # * *Resource:* +:products_product_media+
 #
 # == Schema Layout Matrix
-# [product_id]        Foreign key reference pointing to the parent Product. Constrained to <tt>bigint</tt> to match Shopify's naked ID strategy.
-# [product_media_id]  Foreign key reference pointing to the asset ProductMedia. Maps to the global engine standard <tt>uuid</tt> strategy.
+# [product_id]       Foreign key reference pointing to the parent Product. Constrained to <tt>bigint</tt> to match Shopify's naked ID strategy.
+# [product_media_id] Foreign key reference pointing to the asset ProductMedia. Maps to the global engine standard <tt>uuid</tt> strategy.
 #
-# == Architectural Guardrails
-# * *Cascade Deletion:* Drops the relationship records automatically if either the parent product or media record is destroyed.
-# * *Index Size Ceiling:* Explicitly overrides index names to bypass PostgreSQL's strict 63-character limit constraint rule.
 class CreateXEngineShopifyProductsProductMediaJoinTable < XEngine::Core::Database::Migration
-
-  # Enforce structural namespacing parameters for the join table layout target
-  set_resource :shopify, :products_product_media
 
   # Executes schema generation transformations on the target database engine layer.
   #
@@ -66,19 +62,25 @@ class CreateXEngineShopifyProductsProductMediaJoinTable < XEngine::Core::Databas
 
   private
 
+  # Resolves the database target table directly via table name convention.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= :shopify_products_product_media
+  end
+
   # Resolves the fully namespaced physical table string value for the Product resource.
   #
   # @return [String]
   def product_table
-    XEngine::Core::Model.table_name_for(:shopify, :product)
+    @product_table ||= XEngine::Shopify::Product.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the ProductMedia resource.
   #
   # @return [String]
   def media_table
-    XEngine::Core::Model.table_name_for(:shopify, :product_media)
+    @media_table ||= XEngine::Shopify::ProductMedia.table_name
   end
 
 end
-# :startdoc:

@@ -15,32 +15,37 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Create Shopify Orders Database Provisioner
 #
 # Generates the physical structure for recording core order objects, transaction values,
-# fulfillment checkpoints, and compound scope constraints received from the platform gateway.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:order+
+# fulfillment checkpoints, and compound scope constraints received from the platform gateway (+XEngine::Shopify::Order+).
 #
 # == Schema Layout Matrix
-# [+shop_id+]               The foreign reference link to the owner shop profile.
-# [+name+]                  The descriptive or numeric platform order identity token (e.g., "#1001").
-# [+shipping_country+]      Two-character ISO code mapping the customer delivery destination context.
-# [+total_order_value+]     Gross transactional baseline volume tracking.
-# [+total_received+]        Net processing metric recording actual financial capture sweeps.
+# [shop_id]               The foreign reference link to the owner shop profile.
+# [name]                  The descriptive or numeric platform order identity token (e.g., "#1001").
+# [payment_gateways]      Payment gateway identifiers used for the order.
+# [currency]              Three-letter currency code for order monetary values.
+# [shipping_country]      Two-character ISO code mapping the customer delivery destination context.
+# [financial_status]      Financial payment state of the order.
+# [fulfillment_status]    Fulfillment processing state of the order.
+# [line_items_count]      Cached counter for line items attached to the order.
+# [refunded_items_count]  Cached counter for refunded items.
+# [subtotal]              Subtotal monetary value of the order.
+# [total_shipping]        Shipping cost monetary value.
+# [total_tax]             Tax monetary value.
+# [total_order_value]     Gross transactional baseline volume tracking.
+# [total_refunded_amount] Total monetary amount refunded.
+# [total_received]        Net processing metric recording actual financial capture sweeps.
+# [created_at]            Standard ActiveRecord timestamp.
+# [updated_at]            Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :order
-
   # Executes schema generation transformations on the target database engine layer.
   #
-  # === Returns
-  # * +void+
-  #
+  # @return [void]
   def up
     create_table table_name, **table_options do |t|
 
@@ -80,14 +85,18 @@ class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the Order model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Order.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   #
-  # === Returns
-  # * +String+:: The exact calculated table string target (e.g., +"x_engine_shopify_shops"+).
-  #
+  # @return [String]
   def shop_table
-    XEngine::Core::Model.table_name_for(:shopify, :shop)
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
 
 end
-# :startdoc:

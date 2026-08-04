@@ -14,21 +14,28 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Metafield Database Provisioner
 #
 # Generates the data storage schema layout for high-volume custom metafields. 
-# Implements a light, efficient polymorphic structure linked to the parent shop context.
+# Implements a light, efficient polymorphic structure linked to the parent shop context (+XEngine::Shopify::Metafield+).
 #
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:metafield+
+# == Schema Layout Matrix
+# [id]              Primary Key matching Shopify's naked numeric GraphQL GID.
+# [shop_id]         The foreign reference link to the owner shop profile.
+# [objectable_type] Polymorphic type string for the owner record.
+# [objectable_id]   Polymorphic identifier for the owner record.
+# [namespace]       Structural namespace grouping key for the metafield.
+# [key]             Unique key identifier for the metafield within its namespace.
+# [value]           Serialized or raw string value of the metafield.
+# [created_at]      Standard ActiveRecord timestamp.
+# [updated_at]      Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyMetafields < XEngine::Core::Database::Migration
 
-  # Enforce structural namespacing parameters for the migration table layout target
-  set_resource :shopify, :metafield
-
   # Executes schema generation transformations on the target database engine layer.
+  #
   # @return [void]
   def up
     # Force primary_key: false so we can declare our explicit :id column type manually
@@ -68,11 +75,18 @@ class CreateXEngineShopifyMetafields < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the Metafield model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Metafield.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the primary Shop resource.
+  #
   # @return [String]
   def shop_table
-    XEngine::Core::Model.table_name_for(:shopify, :shop)
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
 
 end
-# :startdoc:

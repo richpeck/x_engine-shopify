@@ -15,33 +15,28 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Webhooks Database Provisioner
 #
 # Generates the multi-tenant tracking schema required to register, monitor, 
 # and selectively filter asynchronous event notifications dispatched from 
-# the Shopify API cluster.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:webhook_subscription+
+# the Shopify API cluster (+XEngine::Shopify::WebhookSubscription+).
 #
 # == Schema Layout Matrix
-# [+shop_id+]            The +uuid+ reference link to the owner store model.
-# [+name+]               A human-readable label identifying the registration context.
-# [+shopify_id+]         The unique identification string returned by Shopify's subscription engine.
-# [+topic+]              The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
-# [+filter+]             An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
-# [+fields+]             An optional comma-separated string array restricting dimensions of the incoming resource payload data layer.
-# [+status+]             The current lifecycle operational state of the endpoint registration (Default: <tt>"disabled"</tt>).
-# [+notes+]              Text block for logging application exceptions, failure tracing, or system alert states.
-#
-# == Index Profiles
-# * A composite unique index is assigned across <tt>[:shop_id, :topic]</tt> to prevent duplicate subscription matrices per client tenant.
+# [id]         System-managed unique primary key handling distributed lookups safely using a native +UUID+ format.
+# [shop_id]    The +uuid+ reference link to the owner store model.
+# [name]       A human-readable label identifying the registration context.
+# [shopify_id] The unique identification string returned by Shopify's subscription engine.
+# [topic]      The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
+# [filter]     An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
+# [fields]     An optional comma-separated string array restricting dimensions of the incoming resource payload data layer.
+# [status]     The current lifecycle operational state of the endpoint registration (Default: <tt>"disabled"</tt>).
+# [notes]      Text block for logging application exceptions, failure tracing, or system alert states.
+# [created_at] Standard ActiveRecord timestamp.
+# [updated_at] Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
-
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :webhooks
 
   # Executes schema generation transformations on the target database engine layer.
   #
@@ -82,14 +77,20 @@ class CreateXEngineShopifyWebhooks < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the Webhook model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Webhook.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   #
   # === Returns
   # * +String+:: The exact calculated table string target (e.g., +"xe_shopify_shops"+).
   #
   def shop_table
-    XEngine::Core::Model.table_name_for(:shopify, :shop)
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
   
 end
-# :startdoc:

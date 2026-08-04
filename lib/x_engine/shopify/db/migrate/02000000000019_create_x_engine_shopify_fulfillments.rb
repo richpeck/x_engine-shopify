@@ -15,21 +15,28 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Create Shopify Fulfillments Database Provisioner
 #
 # Generates the physical relation map table used to inventory tracking milestones,
-# fulfillment state flags, and delivery courier references.
+# fulfillment state flags, and delivery courier references (+XEngine::Shopify::Fulfillment+).
 #
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:fulfillment+
+# == Schema Layout Matrix
+# [order_id]         The foreign reference link to the specific parent order record.
+# [name]             The human-readable name or identifier of the fulfillment.
+# [status]           The processing or delivery status of the fulfillment.
+# [tracking_company] The name of the shipping carrier or courier company.
+# [tracking_numbers] Serialized or split delivery tracking numbers.
+# [tracking_urls]    Serialized or split delivery tracking URLs.
+# [created_at]       Standard ActiveRecord timestamp.
+# [updated_at]       Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyFulfillments < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :fulfillment
-
   # Executes schema generation transformations on the target database engine layer.
+  #
+  # @return [void]
   def up
     create_table table_name, **table_options do |t|
 
@@ -55,10 +62,18 @@ class CreateXEngineShopifyFulfillments < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the Fulfillment model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Fulfillment.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the companion Order resource.
+  #
+  # @return [String]
   def order_table
-    XEngine::Core::Model.table_name_for(:shopify, :order)
+    @order_table ||= XEngine::Shopify::Order.table_name
   end
 
 end
-# :startdoc:

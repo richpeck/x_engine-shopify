@@ -27,39 +27,67 @@ module XEngine
     module Nodes
       # = Refresh Access Token Node
       #
-      # Low-level execution node responsible for performing client credential OAuth exchange 
-      # directly against Shopify's Admin API endpoint.
+      # Low-level system node responsible for performing client credential OAuth exchange
+      # directly against Shopify's Admin API endpoint for a given tenant shop.
       #
-      # == Responsibilities
-      # * Validates presence of target domain and OAuth credentials.
-      # * Sends HTTP POST request using +client_credentials+ grant type.
-      # * Parses JSON token response and calculates absolute expiration time.
+      # Assigns the newly issued token and calculated expiration timestamp directly to the shop model.
+      # Persistence (+save!+) is delegated to the invoking Operation boundary.
+      #
+      # == Usage Example
+      #
+      #   XEngine::Shopify::Nodes::RefreshAccessToken.call(shop: shop)
       #
       class RefreshAccessToken
-        # Executes HTTP OAuth handshake against target Shopify domain.
+
+        # Sugar method allowing direct class-level invocation.
         #
-        # @param myshopify_domain [String] Fully qualified or myshopify domain (e.g., +"store.myshopify.com"+).
-        # @param client_id [String] Shopify App Client ID / API Key.
-        # @param client_secret [String] Shopify App Client Secret.
+        # === Parameters
+        # * +...+ - Arguments forwarded directly to {#call}.
         #
-        # @return [Hash{Symbol => String, ActiveSupport::TimeWithZone}]
-        #   * +:access_token+ [String] Newly issued Admin API access token.
-        #   * +:api_expires+ [Time] Calculated timestamp when token expires.
+        # === Returns
+        # * +XEngine::Shopify::Shop+ - Updated shop record.
         #
-        # @raise [ArgumentError] If any required parameter is missing or blank.
-        # @raise [RuntimeError] If HTTP request fails or response payload is invalid.
+        # @param (see #call)
+        # @return (see #call)
+        # @raise (see #call)
         #
-        def call(myshopify_domain:, client_id:, client_secret:)
-          if myshopify_domain.to_s.strip.empty?
-            raise ArgumentError, "myshopify_domain must be present"
+        def self.call(...)
+          new.call(...)
+        end
+
+        # Executes OAuth client_credentials token handshake and sets attributes on the shop instance.
+        #
+        # === Parameters
+        # * +shop+ [+XEngine::Shopify::Shop+] - Active shop instance to refresh token for.
+        #
+        # === Returns
+        # * +XEngine::Shopify::Shop+ - The shop instance populated with new access_token and api_expires values.
+        #
+        # === Exceptions / Raises
+        # * +ArgumentError+ - If shop record is missing, domain is blank, or credentials are absent.
+        # * +RuntimeError+ - If HTTP request fails or access token missing from response payload.
+        #
+        # @param shop [XEngine::Shopify::Shop] Active shop model instance.
+        # @return [XEngine::Shopify::Shop] Updated shop entity.
+        # @raise [ArgumentError] If shop or required credentials are missing.
+        # @raise [RuntimeError] If OAuth exchange fails upstream.
+        #
+        def call(shop:)
+          raise ArgumentError, "shop record must be present" unless shop.present?
+
+          myshopify_domain = shop.myshopify_domain.to_s.strip
+          if myshopify_domain.empty?
+            raise ArgumentError, "Shop (ID: #{shop.id}) is missing myshopify_domain"
           end
 
-          if client_id.to_s.strip.empty?
-            raise ArgumentError, "client_id is missing or blank for domain '#{myshopify_domain}'"
+          client_id = shop.client_id.to_s.strip
+          if client_id.empty?
+            raise ArgumentError, "Shop (ID: #{shop.id}) is missing client_id"
           end
 
-          if client_secret.to_s.strip.empty?
-            raise ArgumentError, "client_secret is missing or blank for domain '#{myshopify_domain}'"
+          client_secret = shop.client_secret.to_s.strip
+          if client_secret.empty?
+            raise ArgumentError, "Shop (ID: #{shop.id}) is missing client_secret"
           end
 
           uri = URI("https://#{myshopify_domain}/admin/oauth/access_token")
@@ -76,17 +104,22 @@ module XEngine
 
           data = JSON.parse(response.body)
 
-          unless data["access_token"].present?
-            raise "Shopify API response missing expected access_token key"
+          token = data["access_token"].to_s.strip
+          if token.empty?
+            raise "Shopify API response missing expected access_token key for shop ID #{shop.id}"
           end
 
-          {
-            access_token: data["access_token"],
-            api_expires:  Time.current + data["expires_in"].to_i.seconds
-          }
+          expires_in = data["expires_in"].to_i
+
+          ## Attribute Assignment
+          shop.access_token = token                      if shop.respond_to?(:access_token=)
+          shop.api_expires  = Time.current + expires_in  if shop.respond_to?(:api_expires=)
+
+          shop
         rescue StandardError => e
-          raise "Handshake failed: #{e.message}"
+          raise "Handshake failed [Shop ID: #{shop&.id}]: #{e.message}"
         end
+
       end
     end
   end

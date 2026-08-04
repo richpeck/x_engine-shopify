@@ -17,34 +17,28 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Collection Database Provisioner
 #
 # Generates the multi-tenant tracking schema required to store, manage, and query
-# automated or manual product collections synchronized from the Shopify Admin API layer.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:collection+
+# automated or manual product collections synchronized from the Shopify Admin API layer (+XEngine::Shopify::Collection+).
 #
 # == Schema Layout Matrix
-# [id]              The explicit numeric primary key overridden to store Shopify's GID integer directly.
-# [shop_id]         The reference link matching the owner store model.
-# [handle]          Unique string slug used for URL building and SEO routing lookups.
-# [title]           The presentation title name text string for the resource.
-# [body_html]       The raw description rich-text content payload string container.
-# [sort_order]      The default collection layout arrangement token string (e.g., <tt>"alpha-asc"</tt>).
-# [products_count]  Cached calculation counter tracking total assigned child products.
-# [image_id]        Foreign key UUID reference pointing directly to the collection's primary decorative asset.
-# [published_at]    Timestamp marker tracking exactly when the collection was exposed to sales channels.
+# [id]             The explicit numeric primary key overridden to store Shopify's GID integer directly.
+# [shop_id]        The reference link matching the owner store model.
+# [title]          The presentation title name text string for the resource.
+# [handle]         Unique string slug used for URL building and SEO routing lookups.
+# [body_html]      The raw description rich-text content payload string container.
+# [sort_order]     The default collection layout arrangement token string (e.g., <tt>"alpha-asc"</tt>).
+# [products_count] Cached calculation counter tracking total assigned child products.
+# [published_at]   Timestamp marker tracking exactly when the collection was exposed to sales channels.
+# [image_id]       Foreign key UUID reference pointing directly to the collection's primary decorative asset.
+# [created_at]     Standard ActiveRecord timestamp.
+# [updated_at]     Standard ActiveRecord timestamp.
 #
-# == Architectural Guardrails
-# * *Naked BigInt Identifiers:* Overrides the global UUID schema pattern on the base table primary key layer to facilitate raw mathematical integer mappings straight to Shopify's high-volume GID signatures.
-# * *Nullification Integrity:* Utilizes <tt>on_delete: :nullify</tt> constraints on the asset relationship layout to ensure background asset pruning commands do not cause cascade deletions of catalog collections.
 class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :collection
-	
   # Executes schema generation transformations on the target database engine layer.
   #
   # @return [void]
@@ -54,7 +48,7 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
     localized_options = table_options.merge(id: :bigint, default: nil)
 
     create_table table_name, **localized_options do |t|
-			
+      
       t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
       
       # Core Text & Descriptive Attributes
@@ -84,17 +78,23 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the Collection model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Collection.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   # @return [String]
   def shop_table
-    XEngine::Core::Model.table_name_for(:shopify, :shop)
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the +ProductMedia+ resource.
   # @return [String]
   def media_table
-    XEngine::Core::Model.table_name_for(:shopify, :product_media)
+    @media_table ||= XEngine::Shopify::ProductMedia.table_name
   end
-	
+  
 end
-# :startdoc:

@@ -15,14 +15,12 @@
 ####################################
 ####################################
 
+# frozen_string_literal: true
+
 # = Shopify Product Variant Database Provisioner
 #
 # Generates the multi-tenant tracking schema required to store, manage, and query
-# distinct sellable stock-keeping items synchronized from the Shopify Admin API layer.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:product_variant+
+# distinct sellable stock-keeping items synchronized from the Shopify Admin API layer (+XEngine::Shopify::ProductVariant+).
 #
 # == Schema Layout Matrix
 # [id]                 The explicit numeric primary key overridden to store Shopify's GID integer directly.
@@ -30,21 +28,18 @@
 # [featured_image_id]  Foreign key UUID reference pointing directly to the variant's primary media asset.
 # [title]              Used to explain what specific choice format the variant represents.
 # [sku]                Stock keeping unit alphanumeric tracker string used for third-party logistics.
+# [barcode]            Product barcode identifier string.
 # [position]           The sorting priority balance integer value assigned by the merchant layout.
 # [price]              The explicit listing purchase valuation price in decimal format.
 # [cost_price]         The unit operational production expense cost valuation value in decimal format.
 # [inventory_policy]   The fallback out-of-stock treatment token pattern passed by Shopify.
 # [inventory_quantity] The current physical ledger count balance for items present in stock.
 # [country_of_origin]  The standardized ISO tracking territory string code applied to cross-border logistics.
+# [created_at]         Standard ActiveRecord timestamp.
+# [updated_at]         Standard ActiveRecord timestamp.
 #
-# == Architectural Guardrails
-# * *Naked BigInt Identifiers:* Overrides the global UUID schema pattern on the base table primary key layer to facilitate raw mathematical integer mappings straight to Shopify's high-volume GID signatures.
-# * *Nullification Integrity:* Utilizes <tt>on_delete: :nullify</tt> constraints on the asset relationship layout to ensure background asset pruning commands do not cause cascade deletions of structural inventory variants.
 class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :product_variant
-  
   # Executes schema generation transformations on the target database engine layer.
   #
   # @return [void]
@@ -88,17 +83,25 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the ProductVariant model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::ProductVariant.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Product+ resource.
+  #
   # @return [String]
   def product_table
-    XEngine::Core::Model.table_name_for(:shopify, :product)
+    @product_table ||= XEngine::Shopify::Product.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the +ProductMedia+ resource.
+  #
   # @return [String]
   def media_table
-    XEngine::Core::Model.table_name_for(:shopify, :product_media)
+    @media_table ||= XEngine::Shopify::ProductMedia.table_name
   end
   
 end
-# :startdoc:

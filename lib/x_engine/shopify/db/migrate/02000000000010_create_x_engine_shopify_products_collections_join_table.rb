@@ -15,26 +15,18 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Products Collections Association Join Table Provisioner
 #
 # Generates the relational bridge table mapping shopify product models to their
-# respective collections in a multi-tenant many-to-many lookup topology.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:products_collections+
+# respective collections in a multi-tenant many-to-many lookup topology (+XEngine::Shopify::ProductsCollection+).
 #
 # == Schema Layout Matrix
 # [product_id]    Foreign key reference pointing to the parent Product. Constrained to <tt>bigint</tt> to match Shopify's naked ID strategy.
 # [collection_id] Foreign key reference pointing to the parent Collection. Constrained to <tt>bigint</tt> to match Shopify's naked ID strategy.
 #
-# == Architectural Guardrails
-# * *Cascade Deletion:* Drops the relationship records automatically if either the parent product or collection record is destroyed.
-# * *Index Size Ceiling:* Explicitly overrides index names to bypass PostgreSQL's strict 63-character limit constraint rule.
 class CreateXEngineShopifyProductsCollectionsJoinTable < XEngine::Core::Database::Migration
-
-  # Enforce structural namespacing parameters for the join table layout target
-  set_resource :shopify, :products_collections
 
   # Executes schema generation transformations on the target database engine layer.
   #
@@ -67,17 +59,25 @@ class CreateXEngineShopifyProductsCollectionsJoinTable < XEngine::Core::Database
 
   private
 
+  # Resolves the database target table directly from the model class or fallback convention.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= :shopify_collections_products
+  end
+
   # Resolves the fully namespaced physical table string value for the Product resource.
+  #
   # @return [String]
   def product_table
-    XEngine::Core::Model.table_name_for(:shopify, :product)
+    @product_table ||= XEngine::Shopify::Product.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the Collection resource.
+  #
   # @return [String]
   def collection_table
-    XEngine::Core::Model.table_name_for(:shopify, :collection)
+    @collection_table ||= XEngine::Shopify::Collection.table_name
   end
 
 end
-# :startdoc:

@@ -15,33 +15,33 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Create Shopify Line Items Database Provisioner
 #
 # Generates the foundational transaction table schema to log variant breakdowns, quantities, SKUs,
-# and specialized country of origin data blocks to sustain corporate accounting audits.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:line_item+
+# and specialized country of origin data blocks to sustain corporate accounting audits (+XEngine::Shopify::LineItem+).
 #
 # == Schema Layout Matrix
-# [+order_id+]           The foreign reference link to the specific parent order transaction.
-# [+product_id+]         The unconstrained reference ID for the product attached to the line item.
-# [+product_variant_id+] The unconstrained reference ID for the variant attached to the line item.
-# [+title+]              The descriptive text representation name of the line row item.
-# [+country_of_origin+]  Two-character ISO code tracking structural asset provenance fields.
-# [+quantity+]           Integer tracking volume levels purchased inside the line allocation.
+# [order_id]          The foreign reference link to the specific parent order transaction.
+# [product_id]        The unconstrained reference ID for the product attached to the line item.
+# [product_variant_id] The unconstrained reference ID for the variant attached to the line item.
+# [title]             The descriptive text representation name of the line row item.
+# [country_of_origin] Two-character ISO code tracking structural asset provenance fields.
+# [quantity]          Integer tracking volume levels purchased inside the line allocation.
+# [cost_price]        Decimal column tracking unit cost price.
+# [unit_price]        Decimal column tracking unit pricing.
+# [subtotal]          Decimal column tracking line subtotal.
+# [discount_value]    Decimal column tracking applied discounts.
+# [total_received]    Decimal column tracking total amount received.
+# [created_at]        Standard ActiveRecord timestamp.
+# [updated_at]        Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyLineItems < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :line_item
-
   # Executes schema generation transformations on the target database engine layer.
   #
-  # === Returns
-  # * +void+
-  #
+  # @return [void]
   def up
     create_table table_name, **table_options do |t|
 
@@ -74,14 +74,18 @@ class CreateXEngineShopifyLineItems < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the LineItem model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::LineItem.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Order+ resource.
   #
-  # === Returns
-  # * +String+:: The exact calculated table string target (e.g., +"x_engine_shopify_orders"+).
-  #
+  # @return [String]
   def order_table
-    XEngine::Core::Model.table_name_for(:shopify, :order)
+    @order_table ||= XEngine::Shopify::Order.table_name
   end
 
 end
-# :startdoc:

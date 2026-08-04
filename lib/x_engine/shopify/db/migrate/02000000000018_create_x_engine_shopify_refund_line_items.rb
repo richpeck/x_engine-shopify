@@ -15,31 +15,26 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Create Shopify Refund Line Items Database Provisioner
 #
 # Generates the physical relation map table used to inventory refunded items, quantity steps,
-# and dynamically modified pricing parameters.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:refund_line_item+
+# and dynamically modified pricing parameters (+XEngine::Shopify::RefundLineItem+).
 #
 # == Schema Layout Matrix
-# [+refund_id+ ]   The foreign reference link to the specific parent refund transaction.
-# [+line_item_id+] The foreign reference link pointing to the original order line item entry.
-# [+quantity+    ] The specific count footprint of products returned under this specific line.
-# [+subtotal+    ] Decimal column tracking unit cost to guarantee granular VAT recalculation structures.
+# [refund_id]    The foreign reference link to the specific parent refund transaction.
+# [line_item_id] The foreign reference link pointing to the original order line item entry.
+# [quantity]     The specific count footprint of products returned under this specific line.
+# [subtotal]     Decimal column tracking unit cost to guarantee granular VAT recalculation structures.
+# [created_at]   Standard ActiveRecord timestamp.
+# [updated_at]   Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyRefundLineItems < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :refund_line_item
-
   # Executes schema generation transformations on the target database engine layer.
   #
-  # === Returns
-  # * +void+
-  #
+  # @return [void]
   def up
     create_table table_name, **table_options do |t|
 
@@ -66,15 +61,25 @@ class CreateXEngineShopifyRefundLineItems < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the RefundLineItem model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::RefundLineItem.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Refund+ resource.
+  #
+  # @return [String]
   def refund_table
-    XEngine::Core::Model.table_name_for(:shopify, :refund)
+    @refund_table ||= XEngine::Shopify::Refund.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the companion +LineItem+ resource.
+  #
+  # @return [String]
   def line_item_table
-    XEngine::Core::Model.table_name_for(:shopify, :line_item)
+    @line_item_table ||= XEngine::Shopify::LineItem.table_name
   end
 
 end
-# :startdoc:

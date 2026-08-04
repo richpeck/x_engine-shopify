@@ -68,9 +68,11 @@ module XEngine
       # Permits nested assignment during single-pass atomic provisioning operations.
       accepts_nested_attributes_for :credential
 
-      # Expose underlying credential data properties directly on the model via store_accessor.
-      delegate :access_token, :client_id, :client_secret,
-                    to: :credential, allow_nil: true
+      # Expose underlying credential readers and writers directly on the shop instance via proxy builder.
+      delegate :access_token, :access_token=,
+               :client_id, :client_id=,
+               :client_secret, :client_secret=,
+               to: :credential_or_build
 
       # State-aware webhook endpoint subscriptions registered for this specific storefront.
       # Destroying a shop cascades immediately to purge tracking matrices, mitigating orphan records.
@@ -98,10 +100,6 @@ module XEngine
 
       validates :credential, presence: true
       validates :myshopify_domain, presence: true, uniqueness: true
-
-      # Defensive security guard: Assert that the associated credential row is explicitly 
-      # scoped for Shopify operations rather than a mislinked external provider setup.
-      validate :validate_provider_integrity, if: :credential
 
       # ---
       # :section: API Client & Session Interface
@@ -142,6 +140,15 @@ module XEngine
         )
       end
 
+      # Resets memoized API client instances forcing session re-initialization on subsequent calls
+      # (e.g. after OAuth access token refreshes).
+      #
+      # @return [void]
+      def clear_api_clients!
+        @graphql_client = nil
+        @rest_client    = nil
+      end
+
       # ---
       # :section: Instance Helpers
       # ---
@@ -167,16 +174,12 @@ module XEngine
 
       private
 
-      # Defensive multi-tenant provider mapping safety check.
+      # Defensive credential resolution proxy ensuring an associated credential instance exists
+      # prior to setting nested properties directly.
       #
-      # Appends a validation error to +:credential+ if the linked credential record's
-      # +provider_type+ is not strictly set to <tt>"shopify"</tt>.
-      #
-      # @return [void]
-      def validate_provider_integrity
-        return if credential.provider_type == "shopify"
-
-        errors.add(:credential, "must link directly to an explicit 'shopify' provider type token container profile.")
+      # @return [XEngine::Core::Credential]
+      def credential_or_build
+        credential || build_credential
       end
 
     end

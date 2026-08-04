@@ -14,19 +14,18 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Product Tags Association Join Table Provisioner
 #
 # Generates the relational bridge layout table mapping core products to their
-# respective synchronized tags in a many-to-many topology.
+# respective synchronized tags in a many-to-many topology (+XEngine::Shopify::ProductsProductTag+).
 #
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:products_product_tags+
+# == Schema Layout Matrix
+# [product_id]     Foreign key reference pointing to the primary Product table (bigint).
+# [product_tag_id] Foreign key reference pointing to the Product Tag table (uuid).
 #
 class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Database::Migration
-
-  # Enforce structural namespacing parameters for the join table layout target
-  set_resource :shopify, :products_product_tags
 
   # Executes schema generation transformations on the target database engine layer.
   #
@@ -44,13 +43,13 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
                    foreign_key: { to_table: product_table, on_delete: :cascade }
 
       # 2. Foreign key pointing to the Product Tag table
-      t.references :product_tag, 
+      t.references :tag, 
                    type: :uuid, 
                    null: false, 
                    foreign_key: { to_table: tag_table, on_delete: :cascade }
 
       # 3. Composite index optimizing fast bidirectional lookups
-      t.index [:product_id, :product_tag_id], 
+      t.index [:product_id, :tag_id], 
               name: "idx_xe_shopify_prod_tags_assoc", 
               unique: true
     end
@@ -58,17 +57,25 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
 
   private
 
+  # Resolves the database target table directly from the model class or fallback convention.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= :shopify_products_tags
+  end
+
   # Resolves the fully namespaced physical table string value for the Product resource.
+  #
   # @return [String]
   def product_table
-    XEngine::Core::Model.table_name_for(:shopify, :product)
+    @product_table ||= XEngine::Shopify::Product.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the Tag resource.
+  #
   # @return [String]
   def tag_table
-    XEngine::Core::Model.table_name_for(:shopify, :tag)
+    @tag_table ||= XEngine::Shopify::Tag.table_name
   end
 
 end
-# :startdoc:

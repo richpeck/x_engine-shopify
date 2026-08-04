@@ -15,14 +15,12 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Product Database Provisioner
 #
 # Generates the multi-tenant tracking schema required to store, manage, and query
 # base product resources synchronized from the Shopify Admin API layer.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:product+
 #
 # == Schema Layout Matrix
 # [id]                The explicit numeric primary key overridden to store Shopify's GID integer directly.
@@ -38,15 +36,11 @@
 # [tracks_inventory]  Boolean flag indicating whether the platform monitors allocation metrics.
 # [published_at]      Timestamp marker tracking exactly when the product was exposed to the online channel grid.
 # [featured_image_id] Foreign key UUID reference pointing directly to the product's primary media asset.
+# [created_at]        Standard ActiveRecord timestamp.
+# [updated_at]        Standard ActiveRecord timestamp.
 #
-# == Architectural Guardrails
-# * *Naked BigInt Identifiers:* Overrides the global UUID schema pattern on the base table primary key layer to facilitate raw mathematical integer mappings straight to Shopify's high-volume GID signatures.
-# * *Nullification Integrity:* Utilizes <tt>on_delete: :nullify</tt> constraints on the asset relationship layout to ensure background asset pruning commands do not cause cascade deletions of structural catalog products.
 class CreateXEngineShopifyProducts < XEngine::Core::Database::Migration
 
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :product
-	
   # Executes schema generation transformations on the target database engine layer.
   #
   # @return [void]
@@ -57,11 +51,11 @@ class CreateXEngineShopifyProducts < XEngine::Core::Database::Migration
     localized_options = table_options.merge(id: :bigint, default: nil)
 
     create_table table_name, **localized_options do |t|
-			
+      
       t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
       
       # Webhook Identifiers & Content Layout Data
-      t.string  :title,            null: false	
+      t.string  :title,            null: false  
       t.string  :handle,           null: false
       t.text    :body_html                      # Stores the description HTML payload
       t.string  :vendor                         # Stores brand/manufacturer
@@ -85,23 +79,29 @@ class CreateXEngineShopifyProducts < XEngine::Core::Database::Migration
 
       # Added to give us the ability to scope uniqueness safely around order name parameters per-tenant
       t.index [:shop_id, :handle], unique: true, name: "idx_xe_shopify_products_shop_handle"
-			
+      
     end
   end
 
   private
 
+  # Resolves the database target table directly from the Product model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::Product.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   # @return [String]
   def shop_table
-    XEngine::Core::Model.table_name_for(:shopify, :shop)
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the +ProductMedia+ resource.
   # @return [String]
   def media_table
-    XEngine::Core::Model.table_name_for(:shopify, :product_media)
+    @media_table ||= XEngine::Shopify::ProductMedia.table_name
   end
-	
+  
 end
-# :startdoc:

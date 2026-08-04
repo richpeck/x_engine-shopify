@@ -14,28 +14,27 @@
 ################################################################
 ################################################################
 
+# frozen_string_literal: true
+
 # = Shopify Product Media Database Provisioner
 #
 # Generates the multi-tenant tracking schema required to store and manage 
-# rich media resources synchronized from the Shopify API cluster.
-#
-# == Database Resource Configuration
-# * *Namespace:* +:shopify+
-# * *Resource:* +:product_media+
+# rich media resources synchronized from the Shopify API cluster (+XEngine::Shopify::ProductMedia+).
 #
 # == Schema Layout Matrix
-# [shop_id]     The reference link matching the owner store model.
-# [shopify_id]  The unique identifier string passed directly from the Shopify Admin API.
-# [url]         The static CDN location string for the asset payload.
-# [height]      The pixel elevation footprint of the media asset.
-# [width]       The pixel dimensional spread of the media asset.
-# [alt]         The text accessibility fallback string for SEO or display rendering.
-# [media_type]  The explicit asset token identifying content rules (e.g., <tt>"image"</tt>, <tt>"video"</tt>).
-# [meta]        A schema-less JSON block handling customizable platform metadata parameters or overrides.
+# [id]         System-managed unique primary key handling distributed lookups safely using a native +UUID+ format.
+# [shop_id]    The reference link matching the owner store model.
+# [shopify_id] The unique identifier string passed directly from the Shopify Admin API.
+# [url]        The static CDN location string for the asset payload.
+# [height]     The pixel elevation footprint of the media asset.
+# [width]      The pixel dimensional spread of the media asset.
+# [alt]        The text accessibility fallback string for SEO or display rendering.
+# [media_type] The explicit asset token identifying content rules (e.g., <tt>"image"</tt>, <tt>"video"</tt>).
+# [meta]       A schema-less JSON block handling customizable platform metadata parameters or overrides.
+# [created_at] Standard ActiveRecord timestamp.
+# [updated_at] Standard ActiveRecord timestamp.
+#
 class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
-
-  # Trigger dynamic routing mapping variables for engine table namespaces.
-  set_resource :shopify, :product_media
 
   # Executes schema generation transformations on the target database engine layer.
   #
@@ -64,12 +63,18 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
 
   private
 
+  # Resolves the database target table directly from the ProductMedia model class.
+  #
+  # @return [String]
+  def table_name
+    @table_name ||= XEngine::Shopify::ProductMedia.table_name
+  end
+
   # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
   #
   # @return [String]
   def shop_table
-    XEngine::Core::Model.table_name_for(:shopify, :shop)
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
 
 end
-# :startdoc:
