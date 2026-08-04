@@ -79,7 +79,7 @@ module XEngine
         "graphql"                    => "GraphQL",
         "gid"                        => "GID",
         "hmac"                       => "HMAC",
-        "has_graphql_representation" => "HasGraphQLRepresentation"
+        "has_graphql_representation" => "HasGraphQLRepresentation",
         "hmac_verifier"              => "HMACVerifier"
       )
 
