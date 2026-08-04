@@ -21,8 +21,8 @@ require "shopify_api"
 require "dry/monads"
 
 module XEngine
-  module Nodes
-    module Shopify
+  module Shopify
+    module Nodes
       # = HMAC Verifier Node
       #
       # Node component responsible for validating incoming Shopify webhook authenticity.
@@ -45,7 +45,7 @@ module XEngine
       #     code, message = result.failure
       #   end
       #
-      class HmacVerifier
+      class HMACVerifier
         include Dry::Monads[:result]
 
         # Verifies the HMAC signature of an incoming Shopify HTTP payload using ShopifyAPI SDK.

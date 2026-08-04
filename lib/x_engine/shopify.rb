@@ -78,7 +78,9 @@ module XEngine
       app.autoloader.inflector.inflect(
         "graphql"                    => "GraphQL",
         "gid"                        => "GID",
+        "hmac"                       => "HMAC",
         "has_graphql_representation" => "HasGraphQLRepresentation"
+        "hmac_verifier"              => "HMACVerifier"
       )
 
       # Register the various directories required for components
