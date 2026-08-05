@@ -30,12 +30,15 @@ module XEngine
       # Low-level system node responsible for performing client credential OAuth exchange
       # directly against Shopify's Admin API endpoint for a given tenant shop.
       #
-      # Assigns the newly issued token and calculated expiration timestamp directly to the shop model.
+      # Assigns the newly issued token and calculated expiration timestamp directly to the shop model,
+      # and returns a Hash containing the token metadata.
+      #
       # Persistence (+save!+) is delegated to the invoking Operation boundary.
       #
       # == Usage Example
       #
-      #   XEngine::Shopify::Nodes::RefreshAccessToken.call(shop: shop)
+      #   token_payload = XEngine::Shopify::Nodes::RefreshAccessToken.call(shop: shop)
+      #   # => { access_token: "shpca_...", api_expires: 2026-08-05 11:28:48 UTC }
       #
       class RefreshAccessToken
 
@@ -45,7 +48,7 @@ module XEngine
         # * +...+ - Arguments forwarded directly to {#call}.
         #
         # === Returns
-        # * +XEngine::Shopify::Shop+ - Updated shop record.
+        # * +Hash{Symbol => Object}+ - Hash containing +:access_token+ and +:api_expires+.
         #
         # @param (see #call)
         # @return (see #call)
@@ -55,20 +58,22 @@ module XEngine
           new.call(...)
         end
 
-        # Executes OAuth client_credentials token handshake and sets attributes on the shop instance.
+        # Executes OAuth +client_credentials+ token handshake and sets attributes on the shop instance.
         #
         # === Parameters
         # * +shop+ [+XEngine::Shopify::Shop+] - Active shop instance to refresh token for.
         #
         # === Returns
-        # * +XEngine::Shopify::Shop+ - The shop instance populated with new access_token and api_expires values.
+        # * +Hash{Symbol => Object}+ - A Hash payload containing:
+        #   * +:access_token+ [+String+] - The newly issued access token.
+        #   * +:api_expires+ [+ActiveSupport::TimeWithZone+] - The calculated token expiration time.
         #
         # === Exceptions / Raises
-        # * +ArgumentError+ - If shop record is missing, domain is blank, or credentials are absent.
-        # * +RuntimeError+ - If HTTP request fails or access token missing from response payload.
+        # * +ArgumentError+ - If shop record is missing, domain is blank, or client credentials are absent.
+        # * +RuntimeError+ - If HTTP request fails, access token is missing from response payload, or handshake errors out.
         #
         # @param shop [XEngine::Shopify::Shop] Active shop model instance.
-        # @return [XEngine::Shopify::Shop] Updated shop entity.
+        # @return [Hash{Symbol => Object}] Hash containing +:access_token+ and +:api_expires+.
         # @raise [ArgumentError] If shop or required credentials are missing.
         # @raise [RuntimeError] If OAuth exchange fails upstream.
         #
@@ -80,12 +85,14 @@ module XEngine
             raise ArgumentError, "Shop (ID: #{shop.id}) is missing myshopify_domain"
           end
 
-          client_id = shop.client_id.to_s.strip
+          credential    = shop.credential
+          client_id     = (shop.try(:client_id) || credential&.client_id).to_s.strip
+          client_secret = (shop.try(:client_secret) || credential&.client_secret).to_s.strip
+
           if client_id.empty?
             raise ArgumentError, "Shop (ID: #{shop.id}) is missing client_id"
           end
 
-          client_secret = shop.client_secret.to_s.strip
           if client_secret.empty?
             raise ArgumentError, "Shop (ID: #{shop.id}) is missing client_secret"
           end
@@ -102,20 +109,29 @@ module XEngine
             raise "Shopify returned #{response.code}: #{response.body}"
           end
 
-          data = JSON.parse(response.body)
-
+          data  = JSON.parse(response.body)
           token = data["access_token"].to_s.strip
+
           if token.empty?
             raise "Shopify API response missing expected access_token key for shop ID #{shop.id}"
           end
 
-          expires_in = data["expires_in"].to_i
+          expires_in        = data["expires_in"].to_i
+          calculated_expiry = Time.current + expires_in
 
           ## Attribute Assignment
-          shop.access_token = token                      if shop.respond_to?(:access_token=)
-          shop.api_expires  = Time.current + expires_in  if shop.respond_to?(:api_expires=)
+          if credential.present?
+            credential.access_token = token
+          elsif shop.respond_to?(:access_token=)
+            shop.access_token = token
+          end
 
-          shop
+          shop.api_expires = calculated_expiry if shop.respond_to?(:api_expires=)
+
+          {
+            access_token: token,
+            api_expires:  calculated_expiry
+          }
         rescue StandardError => e
           raise "Handshake failed [Shop ID: #{shop&.id}]: #{e.message}"
         end
