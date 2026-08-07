@@ -48,7 +48,9 @@ module XEngine
         # * +block+ [+Proc+] - Required block returning the field tree string.
         #
         def expose_graphql(single: nil, multiple: nil, default_filter: nil, &block)
-          raise ArgumentError, "A configuration block containing fields must be provided" unless block_given?
+          unless block
+            raise ArgumentError, "A configuration block containing fields must be provided when calling expose_graphql on #{name}"
+          end
 
           self._graphql_single_endpoint = single&.to_s
           self._graphql_multiple_endpoint = multiple&.to_s
@@ -56,8 +58,22 @@ module XEngine
           self._graphql_query_block = block
         end
 
+        # Syntactic sugar for nested GraphQL fragments/sub-queries that do not have
+        # standalone single or multiple root endpoints.
+        #
+        # === Parameters
+        # * +block+ [+Proc+] - Required block returning the selection field payload.
+        #
+        def graphql_fragment(&block)
+          unless block
+            raise ArgumentError, "A configuration block containing fields must be provided when calling graphql_fragment on #{name}"
+          end
+
+          expose_graphql(&block)
+        end
+
         # Resolves the configured Shopify Admin GraphQL query entrypoint identifier string.
-        # @return [String]
+        # @return [String, nil]
         def graphql_endpoint(type = :multiple)
           type.to_sym == :single ? _graphql_single_endpoint : _graphql_multiple_endpoint
         end
@@ -74,7 +90,50 @@ module XEngine
         def graphql_query
           return "" unless _graphql_query_block
 
-          _graphql_query_block.call.strip
+          _graphql_query_block.call.to_s.strip
+        end
+
+        # Fetches remote GraphQL nodes by ID via the shop client and persists/hydrates local records.
+        #
+        # @param shop [XEngine::Shopify::Shop] Target store instance
+        # @param ids [Array<String, Integer>] Array of node IDs or GIDs
+        # @return [Array<XEngine::Core::Model>]
+        def sync_nodes_from_shopify(shop:, ids:)
+          formatted_gids = Array(ids).flatten.compact.map do |id|
+            id.to_s.start_with?("gid://") ? id.to_s : "gid://shopify/#{name.demodulize}/#{id}"
+          end
+
+          return [] if formatted_gids.empty?
+
+          gql_query = <<~GRAPHQL
+            query getNodes($ids: [ID!]!) {
+              nodes(ids: $ids) {
+                ... on #{name.demodulize} {
+                  #{graphql_query}
+                }
+              }
+            }
+          GRAPHQL
+
+          response = shop.graphql_client.query(
+            query: gql_query,
+            variables: { ids: formatted_gids }
+          )
+
+          nodes = response.body.dig("data", "nodes") || []
+          
+          nodes.compact.map do |node_data|
+            record = shop.public_send(name.demodulize.underscore.pluralize).find_or_initialize_by(
+              shopify_id: node_data["id"]
+            )
+            
+            # Filter and assign mapped remote GraphQL attributes
+            assignable_attrs = node_data.except("__typename", "id").transform_keys(&:underscore)
+            valid_keys = record.attribute_names
+            
+            record.assign_attributes(assignable_attrs.slice(*valid_keys))
+            record.tap(&:save!)
+          end
         end
       end
     end

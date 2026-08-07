@@ -31,6 +31,7 @@ module XEngine
     # * *Polymorphic Credential Anchor:* Binds to a polymorphically-owned +XEngine::Core::Credential+ row handling encrypted access tokens.
     # * *API Client Factory:* Encapsulates thread-isolated session generation and memoized access to REST and GraphQL Admin API clients.
     # * *GraphQL Hydration Integration:* Declares field mappings consumed by +HasGraphQLRepresentation+ for automated remote metadata synchronization.
+    # * *Resource Dispatcher:* Provides unified entry points (+resync+ / +resync!+) to pull and sync remote GraphQL resources for this store context.
     #
     class Shop < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
@@ -74,25 +75,44 @@ module XEngine
                :client_secret, :client_secret=,
                to: :credential_or_build
 
-      # State-aware webhook endpoint subscriptions registered for this specific storefront.
-      # Destroying a shop cascades immediately to purge tracking matrices, mitigating orphan records.
-      #
-      # @return [ActiveRecord::Associations::CollectionProxy<XEngine::Shopify::Webhook>]
-      has_many :webhooks,
-               class_name: "XEngine::Shopify::Webhook",
-               foreign_key: :shop_id,
-               inverse_of: :shop,
-               dependent: :destroy
+      # Explicit mapping for irregular pluralizations to prevent unwanted ActiveSupport inflections.
+      ASSOCIATION_CLASS_OVERRIDES = {
+        product_media: "ProductMedia"
+      }.freeze
 
-      # Consolidated collection of rich asset components (images, videos, and 3D models)
-      # tied directly to this store instance.
+      # Core domain associations scoped directly to this store instance.
       #
-      # @return [ActiveRecord::Associations::CollectionProxy<XEngine::Shopify::ProductMedia>]
-      has_many :product_media,
-               class_name: "XEngine::Shopify::ProductMedia",
-               foreign_key: :shop_id,
-               inverse_of: :shop,
-               dependent: :destroy
+      # Generates dependent destroy associations for:
+      # * +collections+ (+XEngine::Shopify::Collection+)
+      # * +products+ (+XEngine::Shopify::Product+)
+      # * +orders+ (+XEngine::Shopify::Order+)
+      # * +bulk_operations+ (+XEngine::Shopify::BulkOperation+)
+      # * +webhooks+ (+XEngine::Shopify::Webhook+)
+      # * +product_media+ (+XEngine::Shopify::ProductMedia+)
+      # * +product_images+ (+XEngine::Shopify::ProductImage+)
+      # * +metafields+ (+XEngine::Shopify::Metafield+)
+      #
+      # Destroying a shop cascades immediately to purge all attached records across these collections.
+      #
+      # @return [ActiveRecord::Associations::CollectionProxy]
+      %i[
+        collections
+        products
+        orders
+        bulk_operations
+        webhooks
+        product_media
+        product_images
+        metafields
+      ].each do |assoc|
+        target_class_name = ASSOCIATION_CLASS_OVERRIDES[assoc] || assoc.to_s.classify
+
+        has_many assoc,
+                 class_name: "XEngine::Shopify::#{target_class_name}",
+                 foreign_key: :shop_id,
+                 inverse_of: :shop,
+                 dependent: :destroy
+      end
 
       # ---
       # :section: Validations
@@ -100,6 +120,57 @@ module XEngine
 
       validates :credential, presence: true
       validates :myshopify_domain, presence: true, uniqueness: true
+
+      # ---
+      # :section: Remote Synchronization Routing
+      # ---
+
+      # Dispatches a GraphQL synchronization request for the specified entity class and IDs
+      # using this shop's authenticated GraphQL Admin API context.
+      #
+      # Any record failures during attribute assignment or persistence are swallowed or returned as
+      # unpersisted instances depending on underlying implementation. Use {#resync!} if strict exception
+      # propagation is required.
+      #
+      # @param resource_klass [Class, String, Symbol] A model class including +HasGraphQLRepresentation+ (e.g., +XEngine::Shopify::Product+)
+      # @param ids [Array<String, Integer>, String, Integer] Single ID or array of IDs (raw numeric or GID)
+      # @return [Array<XEngine::Core::Model>] Array of initialized or updated local records
+      #
+      # @example Resync a single product
+      #   shop.resync(XEngine::Shopify::Product, "gid://shopify/Product/123456789")
+      #
+      # @example Resync multiple bulk operations by numeric ID
+      #   shop.resync(XEngine::Shopify::BulkOperation, [101, 102])
+      #
+      def resync(resource_klass, ids)
+        resync!(resource_klass, ids)
+      rescue ActiveRecord::RecordInvalid, StandardError => e
+        logger.error("[XEngine::Shopify::Shop#resync] Sync failed for #{resource_klass}: #{e.message}")
+        []
+      end
+
+      # Dispatches a GraphQL synchronization request for the specified entity class and IDs
+      # strictly raising exceptions if validation or GraphQL transport failures occur.
+      #
+      # @param resource_klass [Class, String, Symbol] A model class including +HasGraphQLRepresentation+ (e.g., +XEngine::Shopify::Product+)
+      # @param ids [Array<String, Integer>, String, Integer] Single ID or array of IDs (raw numeric or GID)
+      # @return [Array<XEngine::Core::Model>] Array of saved local records
+      # @raise [ArgumentError] If the target resource class does not respond to GraphQL sync calls
+      # @raise [ActiveRecord::RecordInvalid] If a record fails validation during save
+      #
+      def resync!(resource_klass, ids)
+        target_ids = Array(ids).flatten.compact
+        return [] if target_ids.empty?
+
+        # Safely resolve constant if passed as String or Symbol
+        klass = resource_klass.is_a?(Class) ? resource_klass : resource_klass.to_s.classify.constantize
+
+        unless klass.respond_to?(:sync_nodes_from_shopify)
+          raise ArgumentError, "#{klass.name} does not support Shopify syncing (missing HasGraphQLRepresentation)"
+        end
+
+        klass.sync_nodes_from_shopify(shop: self, ids: target_ids)
+      end
 
       # ---
       # :section: API Client & Session Interface

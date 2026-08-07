@@ -19,6 +19,8 @@
 
 # frozen_string_literal: true
 
+require "active_support/core_ext/string/indent"
+
 module XEngine
   module Shopify
     # = Shopify Bulk Operation Model
@@ -46,17 +48,19 @@ module XEngine
       # Exposes local model attributes back to GraphQL nodes when fetching operation state.
       expose_graphql single: :node, multiple: :bulk_operations do
         <<~GRAPHQL
-          __typename
-          id
-          status
-          error_code: errorCode
-          created_at: createdAt
-          completed_at: completedAt
-          object_count: objectCount
-          root_object_count: rootObjectCount
-          file_size: fileSize
-          download_url: url
-          query
+          ... on BulkOperation {
+            __typename
+            id
+            status
+            error_code: errorCode
+            created_at: createdAt
+            completed_at: completedAt
+            object_count: objectCount
+            root_object_count: rootObjectCount
+            file_size: fileSize
+            download_url: url
+            query
+          }
         GRAPHQL
       end
 
@@ -173,22 +177,32 @@ module XEngine
       #
       def resolve_and_set_query
         target_klass = object_type.is_a?(Class) ? object_type : Object.const_get(object_type.to_s)
-        root_field   = target_klass.respond_to?(:graphql_root_field) ? target_klass.graphql_root_field : target_klass.table_name
-        selection    = target_klass._graphql_query_block.call.strip
-        query_filter = filters.present? ? "(query: \"#{filters}\")" : ""
+        
+        root_field   = if target_klass.respond_to?(:graphql_endpoint) && target_klass.graphql_endpoint(:multiple).present?
+                         target_klass.graphql_endpoint(:multiple)
+                       elsif target_klass.respond_to?(:graphql_root_field)
+                         target_klass.graphql_root_field
+                       else
+                         target_klass.model_name.element.pluralize
+                       end
 
-        self.query = <<~GRAPHQL
+        selection     = target_klass.graphql_query.indent(8)
+        active_filter = filters.presence || (target_klass.respond_to?(:graphql_default_filter) ? target_klass.graphql_default_filter : nil)
+        query_filter  = active_filter.present? ? "(query: \"#{active_filter}\")" : ""
+
+        self.query = <<~GRAPHQL.strip
           {
             #{root_field}#{query_filter} {
               edges {
                 node {
-                  #{selection}
+            #{selection}
                 }
               }
             }
           }
         GRAPHQL
       end
+
     end
   end
 end

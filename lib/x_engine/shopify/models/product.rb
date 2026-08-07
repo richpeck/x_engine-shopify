@@ -58,10 +58,11 @@ module XEngine
             position
           }
           
-          # Modernized polymorphic asset timeline connection layer
           media(first: 100) {
-            nodes {
-              #{XEngine::Shopify::ProductMedia.graphql_fragment.indent(14)}
+            edges {
+              node {
+                #{XEngine::Shopify::ProductMedia.graphql_query}
+              }
             }
           }
 
@@ -71,23 +72,22 @@ module XEngine
           collections(first: 250) {
             edges {
               node {
-                #{XEngine::Shopify::Collection.graphql_fragment.indent(16)}
+                #{XEngine::Shopify::Collection.graphql_query}
               }
             }
           }
           variants(first: 250) {
             edges {
               node {
-                #{XEngine::Shopify::ProductVariant.graphql_fragment.indent(16)}
+                #{XEngine::Shopify::ProductVariant.graphql_query}
               }
             }
           }
           
-          # Modernized nested fragment tracking for company import workflows
           metafields(first: 250) {
             edges {
               node {
-                #{XEngine::Shopify::Metafield.graphql_fragment.indent(16)}
+                #{XEngine::Shopify::Metafield.graphql_query}
               }
             }
           }
