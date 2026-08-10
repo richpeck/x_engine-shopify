@@ -24,7 +24,8 @@ module XEngine
     #
     # Provides a clean, standardized macro-driven Domain Specific Language (DSL) 
     # allowing database models to declare their external Shopify Admin GraphQL API 
-    # target endpoints, default filters, and query selection schemas explicitly.
+    # target endpoints, default filters, query selection schemas, and attribute 
+    # type transformations explicitly.
     #
     module HasGraphQLRepresentation
       extend ActiveSupport::Concern
@@ -34,6 +35,7 @@ module XEngine
         class_attribute :_graphql_multiple_endpoint, instance_writer: false
         class_attribute :_graphql_default_filter, instance_writer: false
         class_attribute :_graphql_query_block, instance_writer: false
+        class_attribute :_graphql_attribute_transforms, instance_writer: false, default: {}
       end
 
       # Class methods mixed directly into the mounting ActiveRecord target model context.
@@ -72,6 +74,27 @@ module XEngine
           expose_graphql(&block)
         end
 
+        # Macro to declare field type coercion rules for attributes normalized 
+        # from GraphQL responses into ActiveRecord database columns.
+        #
+        # === Parameters
+        # * +transforms+ [+Hash+] - Key-value pairs mapping attribute names to transform types/procs.
+        #
+        # === Example
+        #   graphql_attribute_transforms(
+        #     status: :downcase,
+        #     file_size: :to_i,
+        #     created_at: :to_time
+        #   )
+        #
+        def graphql_attribute_transforms(transforms = nil)
+          if transforms
+            self._graphql_attribute_transforms = _graphql_attribute_transforms.merge(transforms.symbolize_keys)
+          end
+
+          _graphql_attribute_transforms
+        end
+
         # Resolves the configured Shopify Admin GraphQL query entrypoint identifier string.
         # @return [String, nil]
         def graphql_endpoint(type = :multiple)
@@ -91,49 +114,6 @@ module XEngine
           return "" unless _graphql_query_block
 
           _graphql_query_block.call.to_s.strip
-        end
-
-        # Fetches remote GraphQL nodes by ID via the shop client and persists/hydrates local records.
-        #
-        # @param shop [XEngine::Shopify::Shop] Target store instance
-        # @param ids [Array<String, Integer>] Array of node IDs or GIDs
-        # @return [Array<XEngine::Core::Model>]
-        def sync_nodes_from_shopify(shop:, ids:)
-          formatted_gids = Array(ids).flatten.compact.map do |id|
-            id.to_s.start_with?("gid://") ? id.to_s : "gid://shopify/#{name.demodulize}/#{id}"
-          end
-
-          return [] if formatted_gids.empty?
-
-          gql_query = <<~GRAPHQL
-            query getNodes($ids: [ID!]!) {
-              nodes(ids: $ids) {
-                ... on #{name.demodulize} {
-                  #{graphql_query}
-                }
-              }
-            }
-          GRAPHQL
-
-          response = shop.graphql_client.query(
-            query: gql_query,
-            variables: { ids: formatted_gids }
-          )
-
-          nodes = response.body.dig("data", "nodes") || []
-          
-          nodes.compact.map do |node_data|
-            record = shop.public_send(name.demodulize.underscore.pluralize).find_or_initialize_by(
-              shopify_id: node_data["id"]
-            )
-            
-            # Filter and assign mapped remote GraphQL attributes
-            assignable_attrs = node_data.except("__typename", "id").transform_keys(&:underscore)
-            valid_keys = record.attribute_names
-            
-            record.assign_attributes(assignable_attrs.slice(*valid_keys))
-            record.tap(&:save!)
-          end
         end
       end
     end

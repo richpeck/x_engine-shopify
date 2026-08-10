@@ -20,6 +20,9 @@
 # frozen_string_literal: true
 
 require "active_support/core_ext/string/indent"
+require "tempfile"
+require "net/http"
+require "uri"
 
 module XEngine
   module Shopify
@@ -27,7 +30,7 @@ module XEngine
     #
     # Tracks asynchronous GraphQL bulk data operations initiated against Shopify's cloud 
     # infrastructure. This model encapsulates bulk operation tracking, query generation, 
-    # and direct GraphQL mutation dispatching.
+    # network dispatching, and streaming remote JSONL payload files to local temporary files.
     #
     # == Key Responsibilities
     # 1. **Query Construction:** Dynamically builds Shopify-compliant GraphQL bulk queries by 
@@ -36,17 +39,23 @@ module XEngine
     #    owning shop's GraphQL endpoint.
     # 3. **Execution Tracking:** Persists the returned Shopify Global ID (+shopify_id+) and status 
     #    atomically upon successful API acceptance.
+    # 4. **Stream Processing & Verification:** Streams remote `.jsonl` data dumps into managed 
+    #    temporary files (+Tempfile+) while handling automatic resynchronization and expiration checks.
     #
     # == Example Usage
     #   bulk_op = shop.bulk_operations.build(object_type: XEngine::Shopify::Product)
     #   bulk_op.dispatch!
+    #
+    #   bulk_op.download! do |file|
+    #     file.each_line { |line| puts line }
+    #   end
     #
     class BulkOperation < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
       # == GraphQL Layout Declarations
       # Exposes local model attributes back to GraphQL nodes when fetching operation state.
-      expose_graphql single: :node, multiple: :bulk_operations do
+      expose_graphql single: :node do
         <<~GRAPHQL
           ... on BulkOperation {
             __typename
@@ -70,11 +79,18 @@ module XEngine
 
       # [Object, Class, Symbol, String] The target model class (e.g., +XEngine::Shopify::Product+) 
       # used to construct the root GraphQL selection fragment.
-      attr_accessor :object_type
+      attr_reader :object_type
 
       # [String, NilClass] Optional search filter parameters passed directly to the root query line 
       # (e.g., <tt>"status:active AND updated_at:>=2026-01-01"</tt>).
       attr_accessor :filters
+
+      # Custom writer for object_type to immediately resolve and construct the GraphQL query
+      # if assigned after instantiation.
+      def object_type=(value)
+        @object_type = value
+        resolve_and_set_query if @object_type.present?
+      end
 
       # ---
       # :section: Associations
@@ -91,12 +107,13 @@ module XEngine
       # ---
 
       validates :shop, presence: true
+      validates :shopify_id, presence: { message: "must be retrieved from Shopify before saving" }
 
       # ---
       # :section: Lifecycle Hooks
       # ---
 
-      before_validation :resolve_and_set_query, if: -> { query.blank? && object_type.present? }
+      after_initialize :resolve_and_set_query, if: -> { query.blank? && object_type.present? }
 
       # ---
       # :section: Instance Methods
@@ -120,6 +137,8 @@ module XEngine
       #   end
       #
       def dispatch!
+        resolve_and_set_query if query.blank? && object_type.present?
+
         raise ArgumentError, "Cannot dispatch without a valid shop" if shop.blank?
         raise ArgumentError, "Cannot dispatch without a generated query" if query.blank?
 
@@ -164,6 +183,14 @@ module XEngine
         save!
       end
 
+      # Helper indicating if the bulk operation execution has completed successfully on Shopify.
+      #
+      # @return [Boolean] +true+ if status is equal to "completed" (case-insensitive), otherwise +false+.
+      #
+      def completed?
+        status.to_s.downcase == "completed"
+      end
+
       private
 
       # Resolves the target model class and constructs the formatted Shopify bulk GraphQL query string.
@@ -176,6 +203,8 @@ module XEngine
       # @api private
       #
       def resolve_and_set_query
+        return if object_type.blank?
+
         target_klass = object_type.is_a?(Class) ? object_type : Object.const_get(object_type.to_s)
         
         root_field   = if target_klass.respond_to?(:graphql_endpoint) && target_klass.graphql_endpoint(:multiple).present?
@@ -203,7 +232,21 @@ module XEngine
         GRAPHQL
       end
 
+      # Checks if the remote JSONL download URL has expired.
+      #
+      # Shopify bulk operation download URLs are ephemeral and expire strictly 7 days 
+      # after completion. Evaluates the URL presence and tests timestamp age against 7 days ago.
+      #
+      # @return [Boolean] +true+ if URL is blank or completion timestamp is older than 7 days, otherwise +false+.
+      # @api private
+      #
+      def url_expired?
+        return true if url.blank?
+
+        timestamp = completed_at || updated_at || created_at
+        timestamp.blank? || timestamp < 7.days.ago
+      end
+
     end
   end
 end
-# :startdoc:
