@@ -47,7 +47,7 @@ class CreateXEngineShopifyBulkOperations < XEngine::Core::Database::Migration
       t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false
 
       # Shopify Tracking Metadata
-      t.string   :shopify_id,   null: false
+      t.string   :shopify_id,   null: true
       t.string   :status,       null: false, default: "CREATED"
       t.string   :error_code,   null: true # Changed to string in case Shopify uses alphanumeric codes later
       t.bigint   :file_size,    null: true

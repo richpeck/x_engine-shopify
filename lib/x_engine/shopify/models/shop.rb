@@ -89,7 +89,6 @@ module XEngine
       # * +bulk_operations+ (+XEngine::Shopify::BulkOperation+)
       # * +webhooks+ (+XEngine::Shopify::Webhook+)
       # * +product_media+ (+XEngine::Shopify::ProductMedia+)
-      # * +product_images+ (+XEngine::Shopify::ProductImage+)
       # * +metafields+ (+XEngine::Shopify::Metafield+)
       #
       # Destroying a shop cascades immediately to purge all attached records across these collections.
@@ -102,7 +101,6 @@ module XEngine
         bulk_operations
         webhooks
         product_media
-        product_images
         metafields
       ].each do |assoc|
         target_class_name = ASSOCIATION_CLASS_OVERRIDES[assoc] || assoc.to_s.classify

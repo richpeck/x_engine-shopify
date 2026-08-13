@@ -107,7 +107,6 @@ module XEngine
       # ---
 
       validates :shop, presence: true
-      validates :shopify_id, presence: { message: "must be retrieved from Shopify before saving" }
 
       # ---
       # :section: Lifecycle Hooks
