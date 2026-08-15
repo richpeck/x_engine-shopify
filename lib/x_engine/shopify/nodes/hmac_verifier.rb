@@ -32,7 +32,8 @@ module XEngine
       # HTTP header using the store tenant's client secret key.
       #
       # == Example Usage
-      #   node   = XEngine::Application["nodes.shopify.hmac_verifier"]
+      #
+      #   node   = XEngine::Container["shopify.nodes.hmac_verifier"]
       #   result = node.call(
       #     raw_body: request_body_string,
       #     hmac_header: env["HTTP_X_SHOPIFY_HMAC_SHA256"],

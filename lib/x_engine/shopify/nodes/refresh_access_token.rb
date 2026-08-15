@@ -21,84 +21,71 @@
 require "net/http"
 require "uri"
 require "json"
+require "dry/monads"
 
 module XEngine
   module Shopify
     module Nodes
       # = Refresh Access Token Node
       #
-      # Low-level system node responsible for performing client credential OAuth exchange
-      # directly against Shopify's Admin API endpoint for a given tenant shop.
-      #
-      # Assigns the newly issued token and calculated expiration timestamp directly to the shop model,
-      # and returns a Hash containing the token metadata.
-      #
-      # Persistence (+save!+) is delegated to the invoking Operation boundary.
-      #
-      # == Usage Example
-      #
-      #   token_payload = XEngine::Shopify::Nodes::RefreshAccessToken.call(shop: shop)
-      #   # => { access_token: "shpca_...", api_expires: 2026-08-05 11:28:48 UTC }
+      # Low-level system node responsible for verifying and updating tenant Shopify access tokens.
+      # If the shop token is still valid, returns early. Otherwise, performs a client credentials
+      # OAuth handshake, persists changes, and clears cached API clients.
       #
       class RefreshAccessToken
+        include Dry::Monads[:result]
 
-        # Sugar method allowing direct class-level invocation.
-        #
-        # === Parameters
-        # * +...+ - Arguments forwarded directly to {#call}.
-        #
-        # === Returns
-        # * +Hash{Symbol => Object}+ - Hash containing +:access_token+ and +:api_expires+.
-        #
-        # @param (see #call)
-        # @return (see #call)
-        # @raise (see #call)
-        #
         def self.call(...)
           new.call(...)
         end
 
-        # Executes OAuth +client_credentials+ token handshake and sets attributes on the shop instance.
+        # Verifies and refreshes the shop access token.
         #
         # === Parameters
-        # * +shop+ [+XEngine::Shopify::Shop+] - Active shop instance to refresh token for.
+        # * +shop+ [+XEngine::Shopify::Shop+] - Active shop instance to check/refresh.
         #
         # === Returns
-        # * +Hash{Symbol => Object}+ - A Hash payload containing:
-        #   * +:access_token+ [+String+] - The newly issued access token.
-        #   * +:api_expires+ [+ActiveSupport::TimeWithZone+] - The calculated token expiration time.
-        #
-        # === Exceptions / Raises
-        # * +ArgumentError+ - If shop record is missing, domain is blank, or client credentials are absent.
-        # * +RuntimeError+ - If HTTP request fails, access token is missing from response payload, or handshake errors out.
-        #
-        # @param shop [XEngine::Shopify::Shop] Active shop model instance.
-        # @return [Hash{Symbol => Object}] Hash containing +:access_token+ and +:api_expires+.
-        # @raise [ArgumentError] If shop or required credentials are missing.
-        # @raise [RuntimeError] If OAuth exchange fails upstream.
+        # * +Dry::Monads::Result::Success(XEngine::Shopify::Shop)+
+        # * +Dry::Monads::Result::Failure([Symbol, String])+
         #
         def call(shop:)
-          raise ArgumentError, "shop record must be present" unless shop.present?
+          return Failure([:bad_request, "Shop record must be present"]) if shop.blank?
 
-          myshopify_domain = shop.myshopify_domain.to_s.strip
-          if myshopify_domain.empty?
-            raise ArgumentError, "Shop (ID: #{shop.id}) is missing myshopify_domain"
-          end
+          # 1. Skip network exchange if token is still valid
+          return Success(shop) if shop.respond_to?(:access_token_valid?) && shop.access_token_valid?
 
-          credential    = shop.credential
+          # 2. Extract credentials & perform OAuth handshake
+          token_data = fetch_oauth_token(shop)
+          return Failure(token_data) if token_data.is_a?(Array) # Returns error tuple on failure
+
+          # 3. Assign attributes
+          assign_token_attributes(shop, token_data[:token], token_data[:expiry])
+
+          # 4. Persist updated token & expiry
+          save_shop_credentials(shop)
+
+          # 5. Clear cached HTTP/GraphQL client singletons
+          shop.clear_api_clients! if shop.respond_to?(:clear_api_clients!)
+
+          Success(shop)
+        rescue StandardError => e
+          Failure([:unauthorized, "Shopify token handshake failed [Shop ID: #{shop&.id}]: #{e.message}"])
+        end
+
+        private
+
+        def fetch_oauth_token(shop)
+          domain = shop.myshopify_domain.to_s.strip
+          return [:unprocessable_entity, "Shop (ID: #{shop.id}) is missing myshopify_domain"] if domain.empty?
+
+          credential    = shop.try(:credential)
           client_id     = (shop.try(:client_id) || credential&.client_id).to_s.strip
           client_secret = (shop.try(:client_secret) || credential&.client_secret).to_s.strip
 
-          if client_id.empty?
-            raise ArgumentError, "Shop (ID: #{shop.id}) is missing client_id"
-          end
+          return [:unprocessable_entity, "Shop (ID: #{shop.id}) is missing client_id"] if client_id.empty?
+          return [:unprocessable_entity, "Shop (ID: #{shop.id}) is missing client_secret"] if client_secret.empty?
 
-          if client_secret.empty?
-            raise ArgumentError, "Shop (ID: #{shop.id}) is missing client_secret"
-          end
-
-          uri = URI("https://#{myshopify_domain}/admin/oauth/access_token")
-
+          uri      = URI("https://#{domain}/admin/oauth/access_token")
           response = Net::HTTP.post_form(uri, {
             client_id:     client_id,
             client_secret: client_secret,
@@ -106,36 +93,35 @@ module XEngine
           })
 
           unless response.is_a?(Net::HTTPSuccess)
-            raise "Shopify returned #{response.code}: #{response.body}"
+            return [:unauthorized, "Shopify returned HTTP #{response.code}: #{response.body}"]
           end
 
           data  = JSON.parse(response.body)
           token = data["access_token"].to_s.strip
 
-          if token.empty?
-            raise "Shopify API response missing expected access_token key for shop ID #{shop.id}"
-          end
+          return [:unauthorized, "Shopify API response missing access_token key"] if token.empty?
 
-          expires_in        = data["expires_in"].to_i
-          calculated_expiry = Time.current + expires_in
+          expires_in = data["expires_in"].to_i
+          { token: token, expiry: Time.current + expires_in }
+        end
 
-          ## Attribute Assignment
-          if credential.present?
-            credential.access_token = token
+        def assign_token_attributes(shop, token, expiry)
+          if shop.try(:credential).present?
+            shop.credential.access_token = token
           elsif shop.respond_to?(:access_token=)
             shop.access_token = token
           end
 
-          shop.api_expires = calculated_expiry if shop.respond_to?(:api_expires=)
-
-          {
-            access_token: token,
-            api_expires:  calculated_expiry
-          }
-        rescue StandardError => e
-          raise "Handshake failed [Shop ID: #{shop&.id}]: #{e.message}"
+          shop.api_expires = expiry if shop.respond_to?(:api_expires=)
         end
 
+        def save_shop_credentials(shop)
+          if shop.try(:credential).present?
+            shop.credential.save!
+          else
+            shop.save!
+          end
+        end
       end
     end
   end

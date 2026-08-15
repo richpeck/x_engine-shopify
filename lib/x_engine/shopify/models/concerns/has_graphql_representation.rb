@@ -25,7 +25,7 @@ module XEngine
     # Provides a clean, standardized macro-driven Domain Specific Language (DSL) 
     # allowing database models to declare their external Shopify Admin GraphQL API 
     # target endpoints, default filters, query selection schemas, and attribute 
-    # type transformations explicitly.
+    # type transformations.
     #
     module HasGraphQLRepresentation
       extend ActiveSupport::Concern
@@ -49,6 +49,9 @@ module XEngine
         # * +default_filter+ [+String+] - Optional default scope filter.
         # * +block+ [+Proc+] - Required block returning the field tree string.
         #
+        # === Raises
+        # * +ArgumentError+ - If no field selection block is supplied.
+        #
         def expose_graphql(single: nil, multiple: nil, default_filter: nil, &block)
           unless block
             raise ArgumentError, "A configuration block containing fields must be provided when calling expose_graphql on #{name}"
@@ -65,6 +68,9 @@ module XEngine
         #
         # === Parameters
         # * +block+ [+Proc+] - Required block returning the selection field payload.
+        #
+        # === Raises
+        # * +ArgumentError+ - If no field selection block is supplied.
         #
         def graphql_fragment(&block)
           unless block
@@ -87,6 +93,8 @@ module XEngine
         #     created_at: :to_time
         #   )
         #
+        # @return [Hash] Configured attribute transforms mapping.
+        #
         def graphql_attribute_transforms(transforms = nil)
           if transforms
             self._graphql_attribute_transforms = _graphql_attribute_transforms.merge(transforms.symbolize_keys)
@@ -96,20 +104,29 @@ module XEngine
         end
 
         # Resolves the configured Shopify Admin GraphQL query entrypoint identifier string.
+        #
+        # === Parameters
+        # * +type+ [+Symbol+] - Query endpoint type, either +:single+ or +:multiple+ (default).
+        #
         # @return [String, nil]
+        #
         def graphql_endpoint(type = :multiple)
           type.to_sym == :single ? _graphql_single_endpoint : _graphql_multiple_endpoint
         end
 
         # Resolves the default Shopify API query filter string context if declared.
+        #
         # @return [String, nil]
+        #
         def graphql_default_filter
           _graphql_default_filter
         end
 
         # Evaluates the internal macro block composition, compiling and returning 
         # the literal multiline GraphQL field payload string.
+        #
         # @return [String]
+        #
         def graphql_query
           return "" unless _graphql_query_block
 

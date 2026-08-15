@@ -31,7 +31,6 @@ module XEngine
     # * *Polymorphic Credential Anchor:* Binds to a polymorphically-owned +XEngine::Core::Credential+ row handling encrypted access tokens.
     # * *API Client Factory:* Encapsulates thread-isolated session generation and memoized access to REST and GraphQL Admin API clients.
     # * *GraphQL Hydration Integration:* Declares field mappings consumed by +HasGraphQLRepresentation+ for automated remote metadata synchronization.
-    # * *Resource Dispatcher:* Provides unified entry points (+resync+ / +resync!+) to pull and sync remote GraphQL resources for this store context.
     #
     class Shop < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
@@ -118,57 +117,6 @@ module XEngine
 
       validates :credential, presence: true
       validates :myshopify_domain, presence: true, uniqueness: true
-
-      # ---
-      # :section: Remote Synchronization Routing
-      # ---
-
-      # Dispatches a GraphQL synchronization request for the specified entity class and IDs
-      # using this shop's authenticated GraphQL Admin API context.
-      #
-      # Any record failures during attribute assignment or persistence are swallowed or returned as
-      # unpersisted instances depending on underlying implementation. Use {#resync!} if strict exception
-      # propagation is required.
-      #
-      # @param resource_klass [Class, String, Symbol] A model class including +HasGraphQLRepresentation+ (e.g., +XEngine::Shopify::Product+)
-      # @param ids [Array<String, Integer>, String, Integer] Single ID or array of IDs (raw numeric or GID)
-      # @return [Array<XEngine::Core::Model>] Array of initialized or updated local records
-      #
-      # @example Resync a single product
-      #   shop.resync(XEngine::Shopify::Product, "gid://shopify/Product/123456789")
-      #
-      # @example Resync multiple bulk operations by numeric ID
-      #   shop.resync(XEngine::Shopify::BulkOperation, [101, 102])
-      #
-      def resync(resource_klass, ids)
-        resync!(resource_klass, ids)
-      rescue ActiveRecord::RecordInvalid, StandardError => e
-        logger.error("[XEngine::Shopify::Shop#resync] Sync failed for #{resource_klass}: #{e.message}")
-        []
-      end
-
-      # Dispatches a GraphQL synchronization request for the specified entity class and IDs
-      # strictly raising exceptions if validation or GraphQL transport failures occur.
-      #
-      # @param resource_klass [Class, String, Symbol] A model class including +HasGraphQLRepresentation+ (e.g., +XEngine::Shopify::Product+)
-      # @param ids [Array<String, Integer>, String, Integer] Single ID or array of IDs (raw numeric or GID)
-      # @return [Array<XEngine::Core::Model>] Array of saved local records
-      # @raise [ArgumentError] If the target resource class does not respond to GraphQL sync calls
-      # @raise [ActiveRecord::RecordInvalid] If a record fails validation during save
-      #
-      def resync!(resource_klass, ids)
-        target_ids = Array(ids).flatten.compact
-        return [] if target_ids.empty?
-
-        # Safely resolve constant if passed as String or Symbol
-        klass = resource_klass.is_a?(Class) ? resource_klass : resource_klass.to_s.classify.constantize
-
-        unless klass.respond_to?(:sync_nodes_from_shopify)
-          raise ArgumentError, "#{klass.name} does not support Shopify syncing (missing HasGraphQLRepresentation)"
-        end
-
-        klass.sync_nodes_from_shopify(shop: self, ids: target_ids)
-      end
 
       # ---
       # :section: API Client & Session Interface

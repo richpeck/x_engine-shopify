@@ -31,11 +31,7 @@ module XEngine
     # concern, and exposes its standardized field selection footprint via {XEngine::Shopify::HasGraphQLRepresentation}.
     #
     class Collection < XEngine::Core::Model
-      include XEngine::Shopify::HasHandle
       include XEngine::Shopify::HasGraphQLRepresentation
-
-      # Automatically normalize the title attribute into the handle column
-      has_handle :title
 
       # == GraphQL Layout Declarations
       # Binds endpoints, custom selection fragments, and default pipeline filters.
