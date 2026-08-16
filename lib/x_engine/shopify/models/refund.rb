@@ -27,42 +27,104 @@ module XEngine
     # Records and tracks financial order ledger rollbacks inside the system. 
     # Maps distinct line item allocations alongside transaction note contexts.
     #
-    # == Lifecycle Integration
-    # This resource encapsulates its GraphQL representation layouts natively via 
-    # {XEngine::Shopify::HasGraphQLRepresentation}. It queries the 'orders' endpoint 
-    # using strict financial status parameters to fetch only refunded records.
+    # == Architecture & Bulk Query Routing
+    # Shopify's Admin GraphQL API does not expose a root-level +refunds+ endpoint for bulk operations.
+    # To extract refund records in bulk, {expose_graphql} routes through the root +orders+ collection 
+    # (+multiple: :orders+) using financial status filter criteria (+financial_status:refunded OR financial_status:partially_refunded+).
+    #
+    # Consequently, the selection set declared inside {expose_graphql} represents fields evaluated on 
+    # the parent +Order+ node, which queries the +refunds+ connection and its child +refundLineItems+ 
+    # and +transactions+.
+    #
+    # == Schema Adjustments
+    # - +OrderTransaction+ nodes query +id+, +createdAt+, +processedAt+, +authorizationCode+, 
+    #   +receiptJson+, +amountSet+, and +fees+ (avoiding invalid fields +legacyResourceId+, 
+    #   +receiptId+, +fee+, or +updatedAt+).
+    # - +Refund+ records are fetched through the parent +Order+'s +refunds+ connection, avoiding 
+    #   invalid self-nested +refunds+ fields.
+    #
+    # == Schema Attributes
+    # - +id+ [String] Primary key (UUID).
+    # - +order_id+ [String] Foreign key referencing parent {XEngine::Shopify::Order}.
+    # - +shopify_id+ [String] Canonical GraphQL global tracking ID string returned by Shopify (+gid://shopify/Refund/...+).
+    # - +legacy_id+ [Integer] Numeric legacy REST identifier extracted from Shopify.
+    # - +note+ [String] Reason or contextual message attached to the refund transaction.
+    # - +total_refunded_amount+ [BigDecimal] Aggregated financial value credited back to the customer.
+    # - +currency_code+ [String] ISO 4217 currency code (e.g., +"GBP"+, +"USD"+).
+    # - +processed_at+ [DateTime] Timestamp indicating when the refund was executed on Shopify.
+    # - +created_at+ [DateTime] Record creation timestamp.
+    # - +updated_at+ [DateTime] Record modification timestamp.
+    #
+    # @see HasGraphQLRepresentation
+    # @see XEngine::Shopify::Order
+    # @see XEngine::Shopify::RefundLineItem
     #
     class Refund < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
-      # == GraphQL Layout Declarations
+      # =========================================================================
+      # :section: GraphQL Layout Declarations
+      # =========================================================================
+
       # Binds endpoints, selection strings, and the default search criteria query 
       # required to discover refunded entities during synchronization sweeps.
+      #
+      # @note The selection set operates on the parent +Order+ node when executed 
+      #   via the +orders+ root bulk endpoint.
       expose_graphql single: :order, 
                      multiple: :orders, 
                      default_filter: "financial_status:refunded OR financial_status:partially_refunded" do
         <<~GRAPHQL
-          __typename
-          id
-          legacy_id: legacyResourceId
-          refunds {
-            id: legacyResourceId
-            note
-            created_at: createdAt
-            value: totalRefunded {
+          shopify_id: id
+          created_at: createdAt
+          note
+          total_refunded: totalRefundedSet {
+            shopMoney {
               amount
               currencyCode
-            } 
+            }
+          }
+          refunds {
+            id
+            createdAt
+            note
+            totalRefundedSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+          }
+          transactions {
+            id
+            kind
+            status
+            gateway
+            created_at: createdAt
+            processed_at: processedAt
+            authorization_code: authorizationCode
+            receipt_json: receiptJson
+            amount: amountSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
           }
         GRAPHQL
       end
 
-      # == Associations
-      # Structural boundaries tying transaction line item states to underlying entities
+      # =========================================================================
+      # :section: Associations
+      # =========================================================================
+
+      # @!attribute [r] order
+      #   @return [XEngine::Shopify::Order] The parent order entity to which this refund belongs.
       belongs_to :order, class_name: "XEngine::Shopify::Order", inverse_of: :refunds, required: true
       
+      # @!attribute [r] refund_line_items
+      #   @return [ActiveRecord::Associations::CollectionProxy<XEngine::Shopify::RefundLineItem>] Individual item quantity allocations refunded in this transaction.
       has_many :refund_line_items, class_name: "XEngine::Shopify::RefundLineItem", dependent: :destroy, inverse_of: :refund
     end
   end
 end
-# :startdoc:

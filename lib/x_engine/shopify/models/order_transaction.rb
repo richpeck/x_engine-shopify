@@ -38,21 +38,29 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          legacy_id: legacyResourceId
           kind
           status
           gateway
-          transaction_id: receiptId
+          receiptJson
           amount: amountSet {
             shopMoney {
               amount
             }
           }
-          fee: fee {
-            amount
+          fees {
+              amount {
+                  amount
+                  currencyCode
+              }
+              flatFeeName
+              rate
+              rateName
+              taxAmount {
+                  amount
+                  currencyCode
+              }
           }
           created_at: createdAt
-          updated_at: updatedAt
         GRAPHQL
       end
 

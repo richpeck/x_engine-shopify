@@ -41,11 +41,11 @@ module XEngine
       expose_graphql single: :shop do
         <<~GRAPHQL
           __typename
-          id
+          shopify_id:       id
           name
           email
           url
-          currencyCode
+          currency_code:    currencyCode
           myshopify_domain: myshopifyDomain
           created_at:       createdAt
         GRAPHQL

@@ -55,20 +55,19 @@ module XEngine
 
       # == GraphQL Layout Declarations
       # Exposes local model attributes back to GraphQL nodes when fetching operation state.
-      expose_graphql single: :node do
+      expose_graphql single: "node" do
         <<~GRAPHQL
           ... on BulkOperation {
-            __typename
-            id
+            shopify_id:           id
             status
-            error_code: errorCode
-            created_at: createdAt
-            completed_at: completedAt
-            object_count: objectCount
-            root_object_count: rootObjectCount
-            file_size: fileSize
-            download_url: url
-            query
+            error_code:           errorCode
+            created_at:           createdAt
+            completed_at:         completedAt
+            object_count:         objectCount
+            root_object_count:    rootObjectCount
+            file_size:            fileSize
+            url
+            partial_data_url:    partialDataUrl
           }
         GRAPHQL
       end

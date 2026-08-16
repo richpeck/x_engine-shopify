@@ -71,29 +71,25 @@ module XEngine
           shipping_line_items: shippingLines(first: 250) {
             edges {
               node {
-                #{XEngine::Shopify::ShippingLineItem.graphql_fragment.indent(16)}
+                #{XEngine::Shopify::ShippingLineItem.graphql_query.indent(16)}
               }
             }
           }
           
           transactions {
-            #{XEngine::Shopify::OrderTransaction.graphql_fragment.indent(12)}
+            #{XEngine::Shopify::OrderTransaction.graphql_query.indent(12)}
           }
           
           line_items: lineItems(first: 250) {
             edges {
               node {
-                #{XEngine::Shopify::LineItem.graphql_fragment.indent(16)}
+                #{XEngine::Shopify::LineItem.graphql_query.indent(16)}
               }
             }
           }
           
-          refunds {
-            #{XEngine::Shopify::Refund.graphql_fragment.indent(12)}
-          }
-          
           fulfillments {
-            #{XEngine::Shopify::Fulfillment.graphql_fragment.indent(12)}
+            #{XEngine::Shopify::Fulfillment.graphql_query.indent(12)}
           }
         GRAPHQL
       end
@@ -164,4 +160,3 @@ module XEngine
     end
   end
 end
-# :startdoc:

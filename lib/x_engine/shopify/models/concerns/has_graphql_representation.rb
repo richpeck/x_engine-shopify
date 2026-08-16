@@ -27,6 +27,10 @@ module XEngine
     # target endpoints, default filters, query selection schemas, and attribute 
     # type transformations.
     #
+    # Additionally provides instance-level execution methods required by sync pipeline 
+    # nodes (e.g., +XInventory::Nodes::Shopify::ResyncNode+) to dynamically construct 
+    # outbound GraphQL request payloads and hydrate model state from raw API response data.
+    #
     module HasGraphQLRepresentation
       extend ActiveSupport::Concern
 
@@ -36,6 +40,91 @@ module XEngine
         class_attribute :_graphql_default_filter, instance_writer: false
         class_attribute :_graphql_query_block, instance_writer: false
         class_attribute :_graphql_attribute_transforms, instance_writer: false, default: {}
+      end
+
+      # ---
+      # :section: Instance Sync Interface Methods
+      # ---
+
+      # Dynamically compiles the full GraphQL query document and variable payload hash 
+      # required to sync this specific record instance from Shopify.
+      #
+      # Supports both resource-specific ID lookups (e.g., +node(id: $id)+ / +product(id: $id)+) 
+      # and direct root singletons (e.g., +shop+).
+      #
+      # @return [Array(String, Hash)] Tuple containing the executable GraphQL query string and variables hash.
+      #
+      # @example Resource instance with shopify_id
+      #   product.build_graphql_request
+      #   # => ["query fetchProduct($id: ID!) { product(id: $id) { id title } }", { id: "gid://shopify/Product/123" }]
+      #
+      # @example Root singleton instance (Shop)
+      #   shop.build_graphql_request
+      #   # => ["query fetchShop { shop { id name email } }", {}]
+      #
+      def build_graphql_request
+        endpoint     = self.class.graphql_endpoint(:single)
+        query_fields = self.class.graphql_query
+        class_label  = self.class.name.demodulize
+
+        if respond_to?(:shopify_id) && shopify_id.present?
+          query = <<~GRAPHQL
+            query fetch#{class_label}($id: ID!) {
+              #{endpoint}(id: $id) {
+                #{query_fields}
+              }
+            }
+          GRAPHQL
+          variables = { id: shopify_id }
+        else
+          query = <<~GRAPHQL
+            query fetch#{class_label} {
+              #{endpoint} {
+                #{query_fields}
+              }
+            }
+          GRAPHQL
+          variables = {}
+        end
+
+        [query, variables]
+      end
+
+      # Normalizes, transforms, and persists raw GraphQL response attributes directly onto 
+      # the active record instance.
+      #
+      # Keys from the payload are underscored to align with Rails column naming conventions, 
+      # and coerced according to declared +graphql_attribute_transforms+.
+      #
+      # @param response_data [Hash] Raw root +data+ hash extracted from the GraphQL API response body.
+      # @return [ActiveRecord::Base] Self after attribute assignment and persistence.
+      #
+      def hydrate_from_graphql!(response_data)
+        endpoint = self.class.graphql_endpoint(:single)
+        payload  = response_data[endpoint]
+
+        return self unless payload.is_a?(Hash)
+
+        transforms           = self.class.graphql_attribute_transforms
+        attributes_to_assign = {}
+
+        payload.each do |key, value|
+          attr_name = key.to_s.underscore
+          next unless respond_to?("#{attr_name}=")
+
+          transform = transforms[attr_name.to_sym]
+          transformed_value = case transform
+                              when Symbol then value.public_send(transform) rescue value
+                              when Proc   then transform.call(value)
+                              else value
+                              end
+
+          attributes_to_assign[attr_name] = transformed_value
+        end
+
+        assign_attributes(attributes_to_assign)
+        save! if changed?
+        self
       end
 
       # Class methods mixed directly into the mounting ActiveRecord target model context.
@@ -57,10 +146,10 @@ module XEngine
             raise ArgumentError, "A configuration block containing fields must be provided when calling expose_graphql on #{name}"
           end
 
-          self._graphql_single_endpoint = single&.to_s
+          self._graphql_single_endpoint   = single&.to_s
           self._graphql_multiple_endpoint = multiple&.to_s
-          self._graphql_default_filter = default_filter
-          self._graphql_query_block = block
+          self._graphql_default_filter    = default_filter
+          self._graphql_query_block       = block
         end
 
         # Syntactic sugar for nested GraphQL fragments/sub-queries that do not have
