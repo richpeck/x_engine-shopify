@@ -140,10 +140,13 @@ module XEngine
         raise ArgumentError, "Cannot dispatch without a valid shop" if shop.blank?
         raise ArgumentError, "Cannot dispatch without a generated query" if query.blank?
 
+        # Use .to_json to safely escape quotes, newlines, and special characters
+        escaped_query = query.strip.to_json
+
         mutation = <<~GRAPHQL
           mutation {
             bulkOperationRunQuery(
-              query: """#{query.strip}"""
+              query: #{escaped_query}
             ) {
               bulkOperation {
                 id

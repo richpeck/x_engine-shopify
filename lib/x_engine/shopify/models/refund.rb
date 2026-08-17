@@ -96,20 +96,7 @@ module XEngine
             }
           }
           transactions {
-            id
-            kind
-            status
-            gateway
-            created_at: createdAt
-            processed_at: processedAt
-            authorization_code: authorizationCode
-            receipt_json: receiptJson
-            amount: amountSet {
-              shopMoney {
-                amount
-                currencyCode
-              }
-            }
+            #{XEngine::Shopify::OrderTransaction.graphql_query.indent(12)}
           }
         GRAPHQL
       end
