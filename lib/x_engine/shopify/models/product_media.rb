@@ -9,8 +9,10 @@
 ##     \ \__\    \ \__\\ _\\ \_______\ \_______\ \_______\ \_______\  \ \__\       \ \__\    \ \__\ \_______\ \_______\ \__\ \__\ \__\
 ##      \|__|     \|__|\|__|\|_______|\|_______|\|_______|\|_______|   \|__|        \|__|     \|__|\|_______|\|_______|\|__|\|__|\|__|
 ##  --
-##  RPECK 23/04/2026 - WEbhook
-##  Provides the means to interface with the Shopify webhooks system
+##  RPECK 23/04/2026 - Product Media
+##  Model which provides the means to store product media inside the database
+##  --
+##  Ref: 
 ################################################################
 ################################################################
 # :startdoc:
@@ -54,7 +56,6 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          mediaContentType
           
           # 1. Standard 2D Graphical Images
           ... on MediaImage {
@@ -109,5 +110,26 @@ module XEngine
       # Isolate immersive augmented reality (+AR+) or spatial product configurations.
       scope :models, -> { where(media_type: "model") }
     end
+
+    # = Shopify Media Image Subclass
+    # Concrete STI model for static 2D image assets (+MediaImage+).
+    class MediaImage < ProductMedia
+    end
+
+    # = Shopify Video Subclass
+    # Concrete STI model for Shopify-hosted native video files (+Video+).
+    class Video < ProductMedia
+    end
+
+    # = Shopify External Video Subclass
+    # Concrete STI model for embedded external video links (+ExternalVideo+ e.g., YouTube/Vimeo).
+    class ExternalVideo < ProductMedia
+    end
+
+    # = Shopify 3D Model Subclass
+    # Concrete STI model for spatial AR/3D object assets (+Model3d+).
+    class Model3d < ProductMedia
+    end
+
   end
 end

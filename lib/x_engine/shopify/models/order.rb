@@ -35,7 +35,7 @@ module XEngine
       expose_graphql single: :order, multiple: :orders do
         <<~GRAPHQL
           __typename
-          id
+          id: id
           legacy_id: legacyResourceId
           name
           created_at: createdAt

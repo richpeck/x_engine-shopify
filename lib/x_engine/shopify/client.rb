@@ -24,8 +24,8 @@ module XEngine
   module Shopify
     # = XEngine Shopify Client Orchestrator
     #
-    # Encapsulates authentication context boundaries, version targets, and functional API
-    # scope definitions mapping application workflows onto the Shopify Partner ecosystem.
+    # Encapsulates authentication context boundaries, version targets, interpolation settings,
+    # and functional API scope definitions mapping application workflows onto the Shopify Partner ecosystem.
     #
     # == Container Registration
     # Rather than managing configuration globally via class-level constants, instances of this class 
@@ -40,6 +40,14 @@ module XEngine
     #     config.api_secret = "shpss_abc456..."
     #     config.app_domain = "https://app.example.com"
     #     config.scopes     = ["read_products", "write_inventory", "read_orders"]
+    #
+    #     # Interpolation node transformations
+    #     config.interpolation.strip_gids       = true
+    #     config.interpolation.parse_timestamps = true
+    #     config.interpolation.type_mappings["Product"] = "CustomProductModel"
+    #     config.interpolation.custom_rules     = {
+    #       sku: ->(val) { val.to_s.strip.upcase }
+    #     }
     #   end
     #
     class Client
@@ -76,6 +84,89 @@ module XEngine
       # Defaults to <tt>"2026-04"</tt>.
       # @return [String]
       setting :api_version, default: ENV.fetch("XENGINE_SHOPIFY_API_VERSION", "2026-04")
+
+      # = Interpolation Configuration Boundaries
+      # Configures key/value transformations executed by the +JSONInterpolator+ node.
+      setting :interpolation do
+        # @!attribute [rw] strip_gids
+        # Automatically extracts numeric/string identifiers from raw GraphQL GIDs (e.g., "gid://shopify/Product/123" -> "123").
+        # @return [Boolean]
+        setting :strip_gids, default: true
+
+        # @!attribute [rw] parse_timestamps
+        # Converts ISO8601 string values matching UTC timestamps into native +Time+ objects.
+        # @return [Boolean]
+        setting :parse_timestamps, default: true
+
+        # @!attribute [rw] type_mappings
+        # Registry mapping incoming GraphQL +__typename+ identifiers to fully-qualified 
+        # local domain or ActiveRecord model class strings.
+        # @return [Hash{String => String}]
+        setting :type_mappings, default: {
+          "Product"        => "XEngine::Shopify::Product",
+          "ProductVariant" => "XEngine::Shopify::ProductVariant",
+          "MediaImage"     => "XEngine::Shopify::ProductImage",
+          "Video"          => "XEngine::Shopify::ProductVideo"
+        }
+
+        # @!attribute [rw] field_mappings
+        # Model-specific column alias dictionary. Maps GraphQL camelCase keys or 
+        # parent line-item fields directly to target database attribute names.
+        # @return [Hash{String => Hash{String => String}}]
+        setting :field_mappings, default: {
+          "XEngine::Shopify::Product" => {
+            "legacyResourceId" => "legacy_id",
+            "totalInventory"   => "total_inventory",
+            "totalVariants"    => "total_variants",
+            "productType"      => "product_type"
+          },
+          "XEngine::Shopify::ProductVariant" => {
+            "legacyResourceId"  => "legacy_id",
+            "inventoryQuantity" => "inventory_quantity",
+            "parent_id"         => "product_id"
+          },
+          "XEngine::Shopify::ProductImage" => {
+            "parent_id" => "product_id"
+          }
+        }
+
+        # @!attribute [rw] fragment_unwrappers
+        # List of callable Procs/lambdas executed sequentially to unroll nested GraphQL 
+        # sub-fragments (e.g., media node objects or video sources) into flat attributes.
+        # @return [Array<Proc>]
+        setting :fragment_unwrappers, default: [
+          lambda { |raw|
+            if raw["image"].is_a?(Hash)
+              img = raw.delete("image")
+              raw["url"]    ||= img["url"]
+              raw["height"] ||= img["height"]
+              raw["width"]  ||= img["width"]
+              raw["alt"]    ||= img["altText"]
+            end
+            raw
+          },
+          lambda { |raw|
+            if raw["originalSource"].is_a?(Hash)
+              src = raw.delete("originalSource")
+              raw["url"]    ||= src["url"]
+              raw["height"] ||= src["height"]
+              raw["width"]  ||= src["width"]
+            end
+            raw
+          }
+        ]
+
+        # @!attribute [rw] custom_rules
+        # Hash mapping snakified key symbols to executable lambdas or callables for targeted field transformations.
+        # @return [Hash{Symbol => Proc}]
+        setting :custom_rules, default: {}, constructor: ->(rules) {
+          return {} unless rules.is_a?(Hash)
+          
+          rules.each_with_object({}) do |(key, fn), acc|
+            acc[key.to_s.underscore.to_sym] = fn
+          end
+        }
+      end
 
       # Overrides the standard +config+ method signature to intercept and yield configuration blocks.
       # This provides an intuitive object DSL interface for parent initializers to quickly configure settings.

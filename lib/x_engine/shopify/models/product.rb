@@ -36,7 +36,7 @@ module XEngine
 
       # == GraphQL Layout Declarations
       # Binds endpoints, custom selection fragments, and default pipeline filters.
-      expose_graphql single: :product, multiple: :products, default_filter: "status:active" do
+      expose_graphql single: :product, multiple: :products do
         <<~GRAPHQL
           __typename
           id

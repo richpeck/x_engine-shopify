@@ -42,7 +42,7 @@ module XEngine
       expose_graphql single: :collection, multiple: :collections do
         <<~GRAPHQL
           __typename
-          id 
+          id: id 
           legacy_id: legacyResourceId
           title 
           handle 

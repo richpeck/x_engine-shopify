@@ -40,7 +40,9 @@ module XEngine
       # Populated via standard sync/import jobs; defines the standard subselection payload graph.
       expose_graphql do
         <<~GRAPHQL
+          __typename
           id
+          legacy_id: legacyResourceId
           namespace
           key
           value
