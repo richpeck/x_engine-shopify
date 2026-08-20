@@ -19,6 +19,7 @@
 # frozen_string_literal: true
 
 require "dry-configurable"
+require "active_support/core_ext/string/inflections"
 
 module XEngine
   module Shopify
@@ -41,18 +42,11 @@ module XEngine
     #     config.app_domain = "https://app.example.com"
     #     config.scopes     = ["read_products", "write_inventory", "read_orders"]
     #
-    #     # Interpolation node transformations
-    #     config.interpolation.strip_gids       = true
-    #     config.interpolation.parse_timestamps = true
-    #     config.interpolation.type_mappings["Product"] = "CustomProductModel"
-    #     config.interpolation.custom_rules     = {
-    #       sku: ->(val) { val.to_s.strip.upcase }
-    #     }
+    #     # Mutating interpolation custom rules cleanly via Hash access or replacement:
+    #     config.interpolation.custom_rules[:handle] = ->(val) { val.to_s.downcase.strip }
     #   end
     #
     class Client
-      # Including Dry::Configurable at the instance level isolates configurations 
-      # uniquely to individual allocated Shopify manager objects inside the container.
       include Dry::Configurable
 
       # @!attribute [rw] api_key
@@ -89,7 +83,7 @@ module XEngine
       # Configures key/value transformations executed by the +JSONInterpolator+ node.
       setting :interpolation do
         # @!attribute [rw] strip_gids
-        # Automatically extracts numeric/string identifiers from raw GraphQL GIDs (e.g., "gid://shopify/Product/123" -> "123").
+        # Automatically extracts numeric/string identifiers from raw GraphQL GIDs.
         # @return [Boolean]
         setting :strip_gids, default: true
 
@@ -103,6 +97,7 @@ module XEngine
         # local domain or ActiveRecord model class strings.
         # @return [Hash{String => String}]
         setting :type_mappings, default: {
+          "Collection"     => "XEngine::Shopify::Collection",
           "Product"        => "XEngine::Shopify::Product",
           "ProductVariant" => "XEngine::Shopify::ProductVariant",
           "MediaImage"     => "XEngine::Shopify::ProductImage",
@@ -114,6 +109,10 @@ module XEngine
         # parent line-item fields directly to target database attribute names.
         # @return [Hash{String => Hash{String => String}}]
         setting :field_mappings, default: {
+          "XEngine::Shopify::Collection" => {
+            "legacyResourceId" => "legacy_id",
+            "productsCount"    => "products_count"
+          },
           "XEngine::Shopify::Product" => {
             "legacyResourceId" => "legacy_id",
             "totalInventory"   => "total_inventory",
@@ -132,7 +131,7 @@ module XEngine
 
         # @!attribute [rw] fragment_unwrappers
         # List of callable Procs/lambdas executed sequentially to unroll nested GraphQL 
-        # sub-fragments (e.g., media node objects or video sources) into flat attributes.
+        # sub-fragments into flat attributes.
         # @return [Array<Proc>]
         setting :fragment_unwrappers, default: [
           lambda { |raw|
@@ -159,10 +158,10 @@ module XEngine
         # @!attribute [rw] custom_rules
         # Hash mapping snakified key symbols to executable lambdas or callables for targeted field transformations.
         # @return [Hash{Symbol => Proc}]
-        setting :custom_rules, default: {}, constructor: ->(rules) {
-          return {} unless rules.is_a?(Hash)
-          
-          rules.each_with_object({}) do |(key, fn), acc|
+        setting :custom_rules, constructor: ->(rules) {
+          return {} unless rules.respond_to?(:each_pair)
+
+          rules.each_pair.with_object({}) do |(key, fn), acc|
             acc[key.to_s.underscore.to_sym] = fn
           end
         }
@@ -171,9 +170,7 @@ module XEngine
       # Overrides the standard +config+ method signature to intercept and yield configuration blocks.
       # This provides an intuitive object DSL interface for parent initializers to quickly configure settings.
       #
-      # === Yields
-      # * [Dry::Configurable::Config] The active instance configuration state proxy object.
-      #
+      # @yieldparam config [Dry::Configurable::Config] The active instance configuration state proxy object.
       # @return [Dry::Configurable::Config] The configuration manager instance.
       def config
         if block_given?
@@ -194,7 +191,7 @@ module XEngine
       # Convenience helper to form fully-qualified webhook callback URLs or endpoint URIs.
       #
       # @param path [String] Relative path for the callback target.
-      # @return [String]
+      # @return [String] The combined callback URL.
       def callback_url_for(path)
         base = config.app_domain.to_s.chomp("/")
         path = "/#{path.to_s.sub(%r{^/}, '')}"
@@ -208,7 +205,6 @@ module XEngine
       #
       # @param shop [String] The target shop domain name (e.g., "example.myshopify.com").
       # @param token [String] The offline or online access token for the target shop.
-      #
       # @return [ShopifyAPI::Auth::Session] An authenticated session boundary.
       def transient_session(shop:, token:)
         raise ArgumentError, "Shop domain required for transient session" if shop.blank?
