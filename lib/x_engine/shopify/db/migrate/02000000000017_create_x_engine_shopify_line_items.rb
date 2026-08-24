@@ -53,8 +53,8 @@ class CreateXEngineShopifyLineItems < XEngine::Core::Database::Migration
                    index: true
 
       # Loose associations to bypass constraints when remote records don't match local database timeline boundaries
-      t.belongs_to :product, type: :bigint, index: true, foreign_key: false
-      t.belongs_to :product_variant, type: :bigint, index: true, foreign_key: false
+      t.belongs_to :product, type: :uuid, index: true, foreign_key: false
+      t.belongs_to :product_variant, type: :uuid, index: true, foreign_key: false
 
       # String & Ingress Descriptors
       t.string  :title

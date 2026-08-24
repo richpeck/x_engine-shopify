@@ -39,7 +39,7 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          legacy_id: legacyResourceId
+          shopify_id: id
           title
           position
           price
@@ -47,9 +47,6 @@ module XEngine
           barcode
           inventory_policy: inventoryPolicy
           inventory_quantity: inventoryQuantity
-          image {
-            id
-          }
           selectedOptions {
             name
             value

@@ -25,6 +25,7 @@
 # == Schema Layout Matrix
 # [product_id]     The foreign reference link to the parent product model.
 # [shop_id]        The optional foreign reference link to the owner shop context.
+# [shopify_id]     The raw platform identifier returned from the Shopify GraphQL API.
 # [name]           The attribute label for the option matrix (e.g., Size, Color).
 # [position]       Integer index position for UI ordering and payload alignment.
 # [created_at]     Standard ActiveRecord timestamp.
@@ -40,7 +41,7 @@ class CreateXEngineShopifyProductOptions < XEngine::Core::Database::Migration
 
       # Strict relationship binding to the parent product record
       t.belongs_to :product,
-                   type: :uuid,
+                   type: :bigint,
                    foreign_key: { to_table: product_table, on_delete: :cascade },
                    null: false,
                    index: true
@@ -52,12 +53,18 @@ class CreateXEngineShopifyProductOptions < XEngine::Core::Database::Migration
                    null: true,
                    index: true
 
+      # Platform identifier
+      t.string :shopify_id, null: false
+
       # Option Attributes & Display Positioning
       t.string  :name,     null: false
       t.integer :position, null: false, default: 1
 
       t.timestamps
     end
+
+    # Compound unique index for shopify_id scoped to shop context
+    add_index table_name, [:shopify_id, :shop_id], unique: true
 
     # Compound index for position sorting lookups within product context
     add_index table_name, [:product_id, :position]

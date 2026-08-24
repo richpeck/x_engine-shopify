@@ -42,7 +42,7 @@ class CreateXEngineShopifyProductsProductMediaJoinTable < XEngine::Core::Databas
       
       # 1. Foreign key pointing to the Product table (CRITICAL: Must be :bigint to match Shopify's naked ID)
       t.references :product,
-                   type: :bigint,
+                   type: :uuid,
                    null: false,
                    foreign_key: { to_table: product_table, on_delete: :cascade }
 

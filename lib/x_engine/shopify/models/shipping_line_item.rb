@@ -47,6 +47,7 @@ module XEngine
       # directly within the mandatory execution block.
       expose_graphql(single: "node") do
         <<~GRAPHQL
+          __typename
           id
           title
           code

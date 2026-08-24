@@ -26,6 +26,7 @@
 # [type]       Single Table Inheritance (STI) discriminator token (e.g., +XEngine::Shopify::MediaImage+).
 # [shop_id]    The reference link matching the owner store model.
 # [product_id] The reference link matching the parent product model.
+# [shopify_id] External Shopify Global Identifier (GID) or raw numeric API string.
 # [url]        The static CDN location string for the asset payload.
 # [height]     The pixel elevation footprint of the media asset.
 # [width]      The pixel dimensional spread of the media asset.
@@ -41,10 +42,18 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up 
-    create_table table_name, **table_options do |t|
+
+    # Allocate bigint to id column to override the global UUID default strategy.
+    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
+    localized_options = table_options.merge(id: :bigint, default: nil)
+
+    create_table table_name, **localized_options do |t|
 
       t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
-      t.belongs_to :product, type: :string, foreign_key: { to_table: product_table, on_delete: :cascade }, index: true, null: true
+      t.belongs_to :product, type: :bigint, foreign_key: { to_table: product_table, on_delete: :cascade }, index: true, null: true
+
+      # Webhook & GraphQL Identifiers (GID string)
+      t.string :shopify_id, null: false
 
       # STI Discriminator Column
       t.string :type, null: false, index: true
@@ -60,6 +69,9 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
       t.json :meta, default: {}, null: false
 
       t.timestamps 
+
+      # Multi-tenant unique composite index for shop_id + shopify_id mapping
+      t.index [:shop_id, :shopify_id], unique: true, name: "idx_xe_shopify_product_media_shop_shopify_id"
     end
 
     add_index table_name, [:product_id, :type]

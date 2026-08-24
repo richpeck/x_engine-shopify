@@ -34,9 +34,56 @@ module XEngine
     module HasGraphQLRepresentation
       extend ActiveSupport::Concern
 
+      # = Recursive Payload Sanitizer
+      # Unwraps nested GraphQL edge/node/connection structures, flattens payload keys,
+      # and strips out pageInfo metadata across any depth of the response tree.
+      module PayloadSanitizer
+        module_function
+
+        # Recursively inspects incoming GraphQL data structures to flatten connection 
+        # nodes and normalize string keys into underscored Ruby symbols/strings.
+        #
+        # === Parameters
+        # * +payload+ [+Hash+/+Array+/+Object+] - Raw nested GraphQL response object.
+        #
+        # @return [Hash, Array, Object] Cleaned and flattened payload structure.
+        #
+        def sanitize(payload)
+          case payload
+          when Hash
+            # 1. Unwrap GraphQL connection structures ({ "edges" => [{ "node" => ... }] })
+            if payload.key?("edges") && payload["edges"].is_a?(Array)
+              return payload["edges"].map { |edge| sanitize(edge["node"]) }.compact
+            end
+
+            # 2. Unwrap direct single node objects ({ "node" => { ... } })
+            if payload.key?("node") && payload.keys.size == 1
+              return sanitize(payload["node"])
+            end
+
+            # 3. Process key-value pairs recursively & normalize keys to underscored strings
+            cleaned_hash = {}
+            payload.each do |key, val|
+              next if key == "pageInfo" # Omit GraphQL pagination cursors
+
+              cleaned_hash[key.to_s.underscore] = sanitize(val)
+            end
+            cleaned_hash
+
+          when Array
+            payload.map { |item| sanitize(item) }.compact
+
+          else
+            # Primitive scalar values (String, Integer, Boolean, Float, Nil)
+            payload
+          end
+        end
+      end
+
       included do
         class_attribute :_graphql_single_endpoint, instance_writer: false
         class_attribute :_graphql_multiple_endpoint, instance_writer: false
+        class_attribute :_graphql_mutation_endpoint, instance_writer: false
         class_attribute :_graphql_default_filter, instance_writer: false
         class_attribute :_graphql_query_block, instance_writer: false
         class_attribute :_graphql_attribute_transforms, instance_writer: false, default: {}
@@ -49,36 +96,34 @@ module XEngine
       # Dynamically compiles the full GraphQL query document and variable payload hash 
       # required to sync this specific record instance from Shopify.
       #
-      # Supports both resource-specific ID lookups (e.g., +node(id: $id)+ / +product(id: $id)+) 
-      # and direct root singletons (e.g., +shop+).
+      # Supports standard single-node query generation as well as mutation execution syntax.
       #
-      # @return [Array(String, Hash)] Tuple containing the executable GraphQL query string and variables hash.
+      # === Parameters
+      # * +use_mutation+ [+Boolean+] - Whether to compile a mutation operation rather than a query.
       #
-      # @example Resource instance with shopify_id
-      #   product.build_graphql_request
-      #   # => ["query fetchProduct($id: ID!) { product(id: $id) { id title } }", { id: "gid://shopify/Product/123" }]
+      # @return [Array(String, Hash)] Tuple containing the executable GraphQL string and variables hash.
       #
-      # @example Root singleton instance (Shop)
-      #   shop.build_graphql_request
-      #   # => ["query fetchShop { shop { id name email } }", {}]
-      #
-      def build_graphql_request
-        endpoint     = self.class.graphql_endpoint(:single)
-        query_fields = self.class.graphql_query
-        class_label  = self.class.name.demodulize
+      def build_graphql_request(use_mutation: false)
+        endpoint_type = use_mutation ? :mutation : :single
+        endpoint      = self.class.graphql_endpoint(endpoint_type) || self.class.graphql_endpoint(:single)
+        query_fields  = self.class.graphql_query
+        class_label   = self.class.name.demodulize
+        op_type       = use_mutation ? "mutation" : "query"
 
         if respond_to?(:shopify_id) && shopify_id.present?
+          formatted_gid = ensure_shopify_gid(shopify_id, class_label)
+
           query = <<~GRAPHQL
-            query fetch#{class_label}($id: ID!) {
+            #{op_type} fetch#{class_label}($id: ID!) {
               #{endpoint}(id: $id) {
                 #{query_fields}
               }
             }
           GRAPHQL
-          variables = { id: shopify_id }
+          variables = { id: formatted_gid }
         else
           query = <<~GRAPHQL
-            query fetch#{class_label} {
+            #{op_type} fetch#{class_label} {
               #{endpoint} {
                 #{query_fields}
               }
@@ -90,27 +135,52 @@ module XEngine
         [query, variables]
       end
 
-      # Normalizes, transforms, and persists raw GraphQL response attributes directly onto 
+      # Normalizes, sanitizes, transforms, and persists raw GraphQL response attributes directly onto 
       # the active record instance.
       #
-      # Keys from the payload are underscored to align with Rails column naming conventions, 
-      # and coerced according to declared +graphql_attribute_transforms+.
+      # Automatically resolves payload key across single queries, mutations, or generic root keys.
       #
-      # @param response_data [Hash] Raw root +data+ hash extracted from the GraphQL API response body.
+      # === Parameters
+      # * +response_data+ [+Hash+] - Raw root +data+ hash extracted from the GraphQL API response body.
+      #
       # @return [ActiveRecord::Base] Self after attribute assignment and persistence.
       #
       def hydrate_from_graphql!(response_data)
-        endpoint = self.class.graphql_endpoint(:single)
-        payload  = response_data[endpoint]
+        return self unless response_data.is_a?(Hash)
 
-        return self unless payload.is_a?(Hash)
+        # Look up payload target key across :single, :mutation, or fallback to first hash key
+        single_ep   = self.class.graphql_endpoint(:single)
+        mutation_ep = self.class.graphql_endpoint(:mutation)
+
+        raw_payload = if single_ep && response_data.key?(single_ep)
+                        response_data[single_ep]
+                      elsif mutation_ep && response_data.key?(mutation_ep)
+                        response_data[mutation_ep]
+                      else
+                        response_data.values.first || response_data
+                      end
+
+        return self unless raw_payload.is_a?(Hash)
+
+        # 1. Recursively flatten edges/nodes and normalize key names
+        sanitized_payload = PayloadSanitizer.sanitize(raw_payload)
 
         transforms           = self.class.graphql_attribute_transforms
         attributes_to_assign = {}
 
-        payload.each do |key, value|
-          attr_name = key.to_s.underscore
+        # 2. Extract and assign scalar model columns only
+        sanitized_payload.each do |key, value|
+          attr_name = (key == "id" && respond_to?(:shopify_id=) && !respond_to?(:id=)) ? "shopify_id" : key
+
+          # Guard against association collision or un-extracted child collections
+          next if self.class.reflect_on_association(attr_name.to_sym) ||
+                  self.class.reflect_on_association(attr_name.singularize.to_sym) ||
+                  value.is_a?(Hash) ||
+                  value.is_a?(Array)
+
           next unless respond_to?("#{attr_name}=")
+
+          value = ensure_shopify_gid(value, self.class.name.demodulize) if attr_name == "shopify_id"
 
           transform = transforms[attr_name.to_sym]
           transformed_value = case transform
@@ -127,27 +197,46 @@ module XEngine
         self
       end
 
+      private
+
+      # Normalizes an incoming numeric or string ID into a fully qualified Shopify GraphQL 
+      # Global ID (GID) string. Returns the string unmodified if it already features the +gid://shopify/+ scheme.
+      #
+      # === Parameters
+      # * +id_val+ [+String+/+Integer+] - Raw database identifier, numeric string, or existing GID.
+      # * +target_type+ [+String+] - Shopify GraphQL resource class type (e.g., +"Product"+, +"Shop"+).
+      #
+      # @return [String] Formatted GID string (e.g., +"gid://shopify/Product/12345"+).
+      #
+      def ensure_shopify_gid(id_val, target_type)
+        return id_val.to_s if id_val.to_s.start_with?("gid://shopify/")
+
+        "gid://shopify/#{target_type}/#{id_val}"
+      end
+
       # Class methods mixed directly into the mounting ActiveRecord target model context.
       module ClassMethods
         # Registers the structural GraphQL connection endpoint tokens, filters, and payload schema 
         # selection blocks for the active model class structure.
         #
         # === Parameters
-        # * +single+ [+String+/+Symbol+] - Optional single entry point (e.g., +:product+).
+        # * +single+ [+String+/+Symbol+] - Optional single entry point (e.g., +:product+ or +:node+).
         # * +multiple+ [+String+/+Symbol+] - Optional list entry point (e.g., +:products+).
+        # * +mutation+ [+String+/+Symbol+] - Optional mutation entry point (e.g., +:bulkOperationRunQuery+).
         # * +default_filter+ [+String+] - Optional default scope filter.
         # * +block+ [+Proc+] - Required block returning the field tree string.
         #
         # === Raises
         # * +ArgumentError+ - If no field selection block is supplied.
         #
-        def expose_graphql(single: nil, multiple: nil, default_filter: nil, &block)
+        def expose_graphql(single: nil, multiple: nil, mutation: nil, default_filter: nil, &block)
           unless block
             raise ArgumentError, "A configuration block containing fields must be provided when calling expose_graphql on #{name}"
           end
 
           self._graphql_single_endpoint   = single&.to_s
           self._graphql_multiple_endpoint = multiple&.to_s
+          self._graphql_mutation_endpoint = mutation&.to_s
           self._graphql_default_filter    = default_filter
           self._graphql_query_block       = block
         end
@@ -195,12 +284,16 @@ module XEngine
         # Resolves the configured Shopify Admin GraphQL query entrypoint identifier string.
         #
         # === Parameters
-        # * +type+ [+Symbol+] - Query endpoint type, either +:single+ or +:multiple+ (default).
+        # * +type+ [+Symbol+] - Query endpoint type: +:single+, +:multiple+ (default), or +:mutation+.
         #
         # @return [String, nil]
         #
         def graphql_endpoint(type = :multiple)
-          type.to_sym == :single ? _graphql_single_endpoint : _graphql_multiple_endpoint
+          case type.to_sym
+          when :single   then _graphql_single_endpoint
+          when :mutation then _graphql_mutation_endpoint
+          else _graphql_multiple_endpoint
+          end
         end
 
         # Resolves the default Shopify API query filter string context if declared.

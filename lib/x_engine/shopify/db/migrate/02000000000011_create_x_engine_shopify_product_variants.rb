@@ -23,8 +23,9 @@
 # distinct sellable stock-keeping items synchronized from the Shopify Admin API layer (+XEngine::Shopify::ProductVariant+).
 #
 # == Schema Layout Matrix
-# [id]                 The explicit numeric primary key overridden to store Shopify's GID integer directly.
-# [product_id]         The reference link matching the parent catalog product model.
+# [id]                 UUID primary key unique to the local engine instance.
+# [product_id]         Foreign key UUID reference matching the parent catalog product model.
+# [shopify_id]         External Shopify Global Identifier (GID) or raw numeric API string.
 # [featured_image_id]  Foreign key UUID reference pointing directly to the variant's primary media asset.
 # [title]              Used to explain what specific choice format the variant represents.
 # [sku]                Stock keeping unit alphanumeric tracker string used for third-party logistics.
@@ -43,21 +44,24 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
   # Executes schema generation transformations on the target database engine layer.
   #
   # @return [void]
-  def up 
-
-    # Allocate bigint to id column to override the global UUID default strategy.
-    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
-    localized_options = table_options.merge(id: :bigint, default: nil)
-
-    create_table table_name, **localized_options do |t|
+  def up
+    create_table table_name, **table_options do |t|
       
       # Core Structural Parent Links
-      t.belongs_to :product, type: :bigint, foreign_key: { to_table: product_table, on_delete: :cascade }, null: false, index: true
+      t.belongs_to :product,
+                   type: :uuid,
+                   foreign_key: { to_table: product_table, on_delete: :cascade },
+                   null: false,
+                   index: true
+
       t.references :featured_image,
                    type: :uuid,
                    null: true,
                    foreign_key: { to_table: media_table, on_delete: :nullify },
                    index: true
+
+      # Webhook & GraphQL Identifiers
+      t.string :shopify_id, null: true, index: { unique: true, name: "idx_xe_shopify_variants_shopify_id" }
 
       # Variant Identification Parameters
       t.string  :title, null: false

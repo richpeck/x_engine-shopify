@@ -24,6 +24,7 @@
 #
 # == Schema Layout Matrix
 # [shop_id]               The foreign reference link to the owner shop profile.
+# [shopify_id]            The platform global identifier (GID or numeric ID string).
 # [name]                  The descriptive or numeric platform order identity token (e.g., "#1001").
 # [payment_gateways]      Payment gateway identifiers used for the order.
 # [currency]              Three-letter currency code for order monetary values.
@@ -56,6 +57,9 @@ class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
                    null: false,
                    index: true
 
+      # Webhook & GraphQL Identifiers
+      t.string :shopify_id, null: true
+
       # Platform Strings & Context Fields
       t.string :name
       t.string :payment_gateways
@@ -69,17 +73,18 @@ class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
       t.integer :refunded_items_count, default: 0, null: false
 
       # Precision Financial Metrics (10, 2 Scales)
-      t.decimal :subtotal,              precision: 10, scale: 2, default: 0.00, null: false
-      t.decimal :total_shipping,        precision: 10, scale: 2, default: 0.00, null: false
-      t.decimal :total_tax,             precision: 10, scale: 2, default: 0.00, null: false
-      t.decimal :total_order_value,     precision: 10, scale: 2, default: 0.00, null: false
+      t.decimal :subtotal,             precision: 10, scale: 2, default: 0.00, null: false
+      t.decimal :total_shipping,       precision: 10, scale: 2, default: 0.00, null: false
+      t.decimal :total_tax,            precision: 10, scale: 2, default: 0.00, null: false
+      t.decimal :total_order_value,    precision: 10, scale: 2, default: 0.00, null: false
       t.decimal :total_refunded_amount, precision: 10, scale: 2, default: 0.00, null: false
-      t.decimal :total_received,        precision: 10, scale: 2, default: 0.00, null: false
+      t.decimal :total_received,       precision: 10, scale: 2, default: 0.00, null: false
 
       t.timestamps
 
-      # Guarantee unique order name allocations scoped strictly per tenant shop resource
-      t.index [:shop_id, :name], unique: true, name: "idx_x_engine_shopify_orders_on_shop_and_name"
+      # Compound Scope Constraints & Indices for BulkUpsert
+      t.index [:shop_id, :shopify_id], unique: true, name: "idx_x_engine_shopify_orders_on_shop_and_shopify_id"
+      t.index [:shop_id, :name],       unique: true, name: "idx_x_engine_shopify_orders_on_shop_and_name"
     end
   end
 

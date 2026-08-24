@@ -39,6 +39,7 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
+          shopify_id: id
           name
           position
           values

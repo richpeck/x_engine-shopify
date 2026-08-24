@@ -31,6 +31,7 @@ module XEngine
     # * *Polymorphic Credential Anchor:* Binds to a polymorphically-owned +XEngine::Core::Credential+ row handling encrypted access tokens.
     # * *API Client Factory:* Encapsulates thread-isolated session generation and memoized access to REST and GraphQL Admin API clients.
     # * *GraphQL Hydration Integration:* Declares field mappings consumed by +HasGraphQLRepresentation+ for automated remote metadata synchronization.
+    # * *Webhook Endpoint Resolution:* Constructs tenant-scoped callback URLs targeting the +/api/v1/:resource/webhook+ ingress route.
     #
     class Shop < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
@@ -98,7 +99,7 @@ module XEngine
         products
         orders
         bulk_operations
-        webhooks
+        webhook_subscriptions
         product_media
         metafields
       ].each do |assoc|
@@ -167,6 +168,26 @@ module XEngine
       end
 
       # ---
+      # :section: Webhook Endpoint Resolution
+      # ---
+
+      # Generates the fully-qualified HTTPS callback URL for webhook ingestion.
+      #
+      # Translates the target resource (e.g., +"products/update"+ -> +"products"+) to match
+      # the engine's standard webhook ingress routing table:
+      #   <app_domain>/api/v1/:resource/webhook
+      #
+      # @param topic_or_resource [String, Symbol, nil] Optional wire topic (e.g., +"products/update"+) or resource identifier.
+      # @return [String] Fully qualified HTTPS callback URI (e.g., +"https://app.example.com/api/v1/products/webhook"+).
+      #
+      def webhook_callback_url(topic_or_resource = nil)
+        resource = topic_or_resource.to_s.split("/").first.presence&.downcase || "webhooks"
+        client = XEngine::Application["shopify"] rescue XEngine::Shopify::Client.new
+        
+        client.callback_url_for("api/v1/#{resource}/webhook")
+      end
+
+      # ---
       # :section: Instance Helpers
       # ---
 
@@ -198,7 +219,6 @@ module XEngine
       def credential_or_build
         credential || build_credential
       end
-
     end
   end
 end

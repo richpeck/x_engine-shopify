@@ -35,8 +35,8 @@ module XEngine
       expose_graphql single: :order, multiple: :orders do
         <<~GRAPHQL
           __typename
-          id: id
-          legacy_id: legacyResourceId
+          id
+          shopify_id: id
           name
           created_at: createdAt
           payment_gateways: paymentGatewayNames
@@ -46,7 +46,11 @@ module XEngine
           currency: currencyCode
           fulfillment_status: displayFulfillmentStatus
           financial_status: displayFinancialStatus
-          subtotal: subtotalPrice
+          subtotal: subtotalPriceSet {
+            shopMoney {
+              amount
+            }
+          }
           total_shipping: totalShippingPriceSet {
             shopMoney {
               amount
@@ -68,7 +72,7 @@ module XEngine
             }
           }
           
-          shipping_line_items: shippingLines(first: 250) {
+          shipping_line_items: shippingLines(first:250) {
             edges {
               node {
                 #{XEngine::Shopify::ShippingLineItem.graphql_query.indent(16)}
@@ -76,11 +80,11 @@ module XEngine
             }
           }
           
-          transactions {
+          transactions(first:250) {
             #{XEngine::Shopify::OrderTransaction.graphql_query.indent(12)}
           }
           
-          line_items: lineItems(first: 250) {
+          line_items: lineItems(first:250) {
             edges {
               node {
                 #{XEngine::Shopify::LineItem.graphql_query.indent(16)}
@@ -88,8 +92,12 @@ module XEngine
             }
           }
           
-          fulfillments {
+          fulfillments(first:250) {
             #{XEngine::Shopify::Fulfillment.graphql_query.indent(12)}
+          }
+
+          refunds(first:250) {
+            #{XEngine::Shopify::Refund.graphql_query.indent(12)}
           }
         GRAPHQL
       end

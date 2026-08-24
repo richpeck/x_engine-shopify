@@ -71,32 +71,17 @@ module XEngine
       #
       # @note The selection set operates on the parent +Order+ node when executed 
       #   via the +orders+ root bulk endpoint.
-      expose_graphql single: :order, 
-                     multiple: :orders, 
-                     default_filter: "financial_status:refunded OR financial_status:partially_refunded" do
+      expose_graphql do
         <<~GRAPHQL
-          shopify_id: id
+          __typename
+          id
           created_at: createdAt
           note
-          total_refunded: totalRefundedSet {
+          totalRefundedSet {
             shopMoney {
               amount
               currencyCode
             }
-          }
-          refunds {
-            id
-            createdAt
-            note
-            totalRefundedSet {
-              shopMoney {
-                amount
-                currencyCode
-              }
-            }
-          }
-          transactions {
-            #{XEngine::Shopify::OrderTransaction.graphql_query.indent(12)}
           }
         GRAPHQL
       end

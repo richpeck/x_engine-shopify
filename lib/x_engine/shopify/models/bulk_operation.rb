@@ -21,8 +21,6 @@
 
 require "active_support/core_ext/string/indent"
 require "tempfile"
-require "net/http"
-require "uri"
 
 module XEngine
   module Shopify
@@ -33,62 +31,74 @@ module XEngine
     # network dispatching, and streaming remote JSONL payload files to local temporary files.
     #
     # == Key Responsibilities
-    # 1. **Query Construction:** Dynamically builds Shopify-compliant GraphQL bulk queries by 
-    #    extracting representation fragments from target domain models.
-    # 2. **Network Dispatch:** Executes the +bulkOperationRunQuery+ mutation against the 
-    #    owning shop's GraphQL endpoint.
-    # 3. **Execution Tracking:** Persists the returned Shopify Global ID (+shopify_id+) and status 
+    # 1. *Query Construction:* Dynamically builds Shopify-compliant GraphQL bulk queries by 
+    #    extracting representation fragments from target domain models and search filters.
+    # 2. *Dual-Mode Request Dispatch:* Implements +#build_graphql_request+ to yield a 
+    #    dispatch mutation (+bulkOperationRunQuery+) when un-synced, or delegate to standard 
+    #    +HasGraphQLRepresentation+ polling queries once persisted with a +shopify_id+.
+    # 3. *Execution Tracking:* Persists the returned Shopify Global ID (+shopify_id+) and status 
     #    atomically upon successful API acceptance.
-    # 4. **Stream Processing & Verification:** Streams remote `.jsonl` data dumps into managed 
-    #    temporary files (+Tempfile+) while handling automatic resynchronization and expiration checks.
     #
     # == Example Usage
-    #   bulk_op = shop.bulk_operations.build(object_type: XEngine::Shopify::Product)
-    #   bulk_op.dispatch!
+    #   bulk_op = shop.bulk_operations.build(
+    #     object_type: "XEngine::Shopify::Product",
+    #     filter: "created_at:2026-01-01..2026-12-31"
+    #   )
     #
-    #   bulk_op.download! do |file|
-    #     file.each_line { |line| puts line }
-    #   end
+    #   query, variables = bulk_op.build_graphql_request
+    #   response = shop.graphql_client.query(query: query, variables: variables)
     #
     class BulkOperation < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
 
       # == GraphQL Layout Declarations
       # Exposes local model attributes back to GraphQL nodes when fetching operation state.
-      expose_graphql single: "node" do
+      expose_graphql single: :node, mutation: :bulkOperationRunQuery do
         <<~GRAPHQL
+          __typename
           ... on BulkOperation {
-            shopify_id:           id
+            shopify_id:        id
             status
-            error_code:           errorCode
-            created_at:           createdAt
-            completed_at:         completedAt
-            object_count:         objectCount
-            root_object_count:    rootObjectCount
-            file_size:            fileSize
+            error_code:       errorCode
+            created_at:       createdAt
+            completed_at:     completedAt
+            object_count:     objectCount
+            root_object_count: rootObjectCount
+            file_size:         fileSize
             url
-            partial_data_url:    partialDataUrl
-          }
+            partial_data_url: partialDataUrl
+        }
         GRAPHQL
       end
 
-      # ---
-      # :section: Attribute Accessors
-      # ---
+      # Alias plural 'filters' to the backing 'filter' schema column for API backwards compatibility
+      alias_attribute :filters, :filter
 
-      # [Object, Class, Symbol, String] The target model class (e.g., +XEngine::Shopify::Product+) 
-      # used to construct the root GraphQL selection fragment.
-      attr_reader :object_type
-
-      # [String, NilClass] Optional search filter parameters passed directly to the root query line 
-      # (e.g., <tt>"status:active AND updated_at:>=2026-01-01"</tt>).
-      attr_accessor :filters
-
-      # Custom writer for object_type to immediately resolve and construct the GraphQL query
-      # if assigned after instantiation.
+      # Custom writer for +object_type+ to immediately resolve and construct the GraphQL query
+      # if assigned or modified after initialization.
+      #
+      # === Parameters
+      # * +value+ [+String+, +Class+] - The class name or class object representing the target model.
+      #
+      # === Returns
+      # * [+String+, +Class+] The assigned value.
+      #
       def object_type=(value)
-        @object_type = value
-        resolve_and_set_query if @object_type.present?
+        super
+        resolve_and_set_query if object_type.present?
+      end
+
+      # Custom writer for +filter+ to re-compile the outbound query document on assignment.
+      #
+      # === Parameters
+      # * +value+ [+String+, +nil+] - Search filter query string passed to Shopify GQL search.
+      #
+      # === Returns
+      # * [+String+, +nil+] The assigned filter value.
+      #
+      def filter=(value)
+        super
+        resolve_and_set_query if object_type.present?
       end
 
       # ---
@@ -106,6 +116,7 @@ module XEngine
       # ---
 
       validates :shop, presence: true
+      validates :object_type, presence: true
 
       # ---
       # :section: Lifecycle Hooks
@@ -117,40 +128,55 @@ module XEngine
       # :section: Instance Methods
       # ---
 
-      # Dispatches the generated bulk GraphQL query to Shopify's Admin API.
+      # Dynamically determines the appropriate GraphQL request payload depending on local record state.
       #
-      # Executes the +bulkOperationRunQuery+ mutation using the associated shop's GraphQL client.
-      # On success, assigns the returned +shopify_id+ and +status+ to self and persists the record.
+      # When unsourced (+shopify_id+ is blank), constructs the +bulkOperationRunQuery+ 
+      # mutation to initiate the bulk operation on Shopify.
       #
-      # @return [Boolean] +true+ if the operation was accepted by Shopify and saved locally, 
-      #   +false+ if validation or API errors occurred.
-      # @raise [ArgumentError] If +shop+ or +query+ is missing prior to execution.
+      # When sourced (+shopify_id+ is present), delegates to +HasGraphQLRepresentation#build_graphql_request+
+      # to fetch current bulk operation status from Shopify.
       #
-      # == Examples
-      #   bulk_op = shop.bulk_operations.build(object_type: "XEngine::Shopify::Product")
-      #   if bulk_op.dispatch!
-      #     puts "Dispatched operation: #{bulk_op.shopify_id}"
-      #   else
-      #     puts "Failed: #{bulk_op.errors.full_messages.join(', ')}"
-      #   end
+      # === Returns
+      # * [+Array(String, Hash)+] A tuple containing the GraphQL string document and variable bindings hash.
       #
-      def dispatch!
-        resolve_and_set_query if query.blank? && object_type.present?
+      # === Examples
+      #   bulk_op.build_graphql_request
+      #   # => ["mutation BulkOperationRunQuery($query: String!) { ... }", {:query=>"{ products { ... } }"}]
+      #
+      def build_graphql_request
+        if shopify_id.blank?
+          build_creation_mutation
+        else
+          super # Delegates to HasGraphQLRepresentation standard query generator
+        end
+      end
 
-        raise ArgumentError, "Cannot dispatch without a valid shop" if shop.blank?
-        raise ArgumentError, "Cannot dispatch without a generated query" if query.blank?
+      # Helper indicating if the bulk operation execution has completed successfully on Shopify.
+      #
+      # === Returns
+      # * [+Boolean+] +true+ if status is equal to +"completed"+ (case-insensitive), otherwise +false+.
+      #
+      def completed?
+        status.to_s.downcase == "completed"
+      end
 
-        # Use .to_json to safely escape quotes, newlines, and special characters
-        escaped_query = query.strip.to_json
+      private
 
+      # Generates the +bulkOperationRunQuery+ GraphQL mutation tuple for initializing a bulk operation on Shopify.
+      #
+      # === Returns
+      # * [+Array(String, Hash)+] Mutation GQL document and variables hash containing the inner query payload.
+      #
+      def build_creation_mutation
         mutation = <<~GRAPHQL
-          mutation {
-            bulkOperationRunQuery(
-              query: #{escaped_query}
-            ) {
+          mutation BulkOperationRunQuery($query: String!) {
+            bulkOperationRunQuery(query: $query) {
               bulkOperation {
-                id
+                __typename
+                shopify_id: id
                 status
+                created_at: createdAt
+                error_code: errorCode
               }
               userErrors {
                 field
@@ -160,39 +186,8 @@ module XEngine
           }
         GRAPHQL
 
-        response = shop.graphql_client.query(query: mutation)
-        payload  = response.body.dig("data", "bulkOperationRunQuery")
-        errors   = payload&.dig("userErrors") || []
-
-        if errors.any?
-          messages = errors.map { |e| "#{e['field']}: #{e['message']}" }.join(", ")
-          self.errors.add(:base, "Shopify dispatch failed: #{messages}")
-          return false
-        end
-
-        bulk_op_data = payload&.dig("bulkOperation")
-        if bulk_op_data.blank?
-          self.errors.add(:base, "Shopify returned no operation payload")
-          return false
-        end
-
-        assign_attributes(
-          shopify_id: bulk_op_data["id"],
-          status:     bulk_op_data["status"]&.downcase || "created"
-        )
-
-        save!
+        [mutation, { query: query.to_s.strip }]
       end
-
-      # Helper indicating if the bulk operation execution has completed successfully on Shopify.
-      #
-      # @return [Boolean] +true+ if status is equal to "completed" (case-insensitive), otherwise +false+.
-      #
-      def completed?
-        status.to_s.downcase == "completed"
-      end
-
-      private
 
       # Resolves the target model class and constructs the formatted Shopify bulk GraphQL query string.
       #
@@ -200,32 +195,37 @@ module XEngine
       # from +_graphql_query_block+. Wraps the inner fields in the +edges { node { ... } }+ structure 
       # required by Shopify's bulk API parser.
       #
-      # @return [void]
-      # @api private
+      # === Returns
+      # * [+String+] The compiled query string written directly to the +query+ attribute.
       #
       def resolve_and_set_query
         return if object_type.blank?
 
         target_klass = object_type.is_a?(Class) ? object_type : Object.const_get(object_type.to_s)
-        
-        root_field   = if target_klass.respond_to?(:graphql_endpoint) && target_klass.graphql_endpoint(:multiple).present?
-                         target_klass.graphql_endpoint(:multiple)
-                       elsif target_klass.respond_to?(:graphql_root_field)
-                         target_klass.graphql_root_field
-                       else
-                         target_klass.model_name.element.pluralize
-                       end
 
-        selection     = target_klass.graphql_query.indent(8)
-        active_filter = filters.presence || (target_klass.respond_to?(:graphql_default_filter) ? target_klass.graphql_default_filter : nil)
-        query_filter  = active_filter.present? ? "(query: \"#{active_filter}\")" : ""
+        root_field = if target_klass.respond_to?(:graphql_endpoint) && target_klass.graphql_endpoint(:multiple).present?
+                       target_klass.graphql_endpoint(:multiple)
+                     elsif target_klass.respond_to?(:graphql_root_field)
+                       target_klass.graphql_root_field
+                     else
+                       target_klass.model_name.element.pluralize
+                     end
+
+        selection = target_klass.graphql_query.indent(8)
+        
+        # Explicitly read from self.filter to capture unsaved attribute changes
+        raw_filter = read_attribute(:filter).presence || filter.presence
+        active_filter = raw_filter || (target_klass.respond_to?(:graphql_default_filter) ? target_klass.graphql_default_filter : nil)
+
+        # Safely construct the GraphQL query argument
+        query_filter = active_filter.present? ? "(query: #{active_filter.strip.to_json})" : ""
 
         self.query = <<~GRAPHQL.strip
           {
             #{root_field}#{query_filter} {
               edges {
                 node {
-            #{selection}
+          #{selection}
                 }
               }
             }
@@ -238,8 +238,8 @@ module XEngine
       # Shopify bulk operation download URLs are ephemeral and expire strictly 7 days 
       # after completion. Evaluates the URL presence and tests timestamp age against 7 days ago.
       #
-      # @return [Boolean] +true+ if URL is blank or completion timestamp is older than 7 days, otherwise +false+.
-      # @api private
+      # === Returns
+      # * [+Boolean+] +true+ if URL is blank or completion timestamp is older than 7 days, otherwise +false+.
       #
       def url_expired?
         return true if url.blank?

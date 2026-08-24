@@ -46,6 +46,7 @@ module XEngine
       # returned when calling +LineItem.graphql_query+.
       expose_graphql single: "node" do
         <<~GRAPHQL
+          __typename
           id
           title
           quantity

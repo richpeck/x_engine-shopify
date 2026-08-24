@@ -40,25 +40,30 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          legacy_id: legacyResourceId
+          shopify_id: id
           handle
           title
           tags
           status
+          description: descriptionHtml
+          vendor
+          product_type: productType
           total_inventory: totalInventory
           tracks_inventory: tracksInventory
           created_at: createdAt
+          published_at: publishedAt
           price: priceRangeV2 {
             min: minVariantPrice { amount }
             max: maxVariantPrice { amount }
           }
-          options {
+
+          options(first:250) {
             id
             name
             position
           }
           
-          media(first: 100) {
+          media(first:250) {
             edges {
               node {
                 #{XEngine::Shopify::ProductMedia.graphql_query}
@@ -66,9 +71,10 @@ module XEngine
             }
           }
 
-          featured_image: featuredImage {
+          featured_image_id: featuredMedia {
             id
           }
+
           collections(first: 250) {
             edges {
               node {
@@ -95,11 +101,27 @@ module XEngine
       end
 
       # == Enums
-      enum :status, { active: 0, draft: 1, archived: 2, unlisted: 3 }, default: :draft
+      # String-backed enum aligns directly with Shopify string values and DB string columns
+      enum :status, {
+        active: "active",
+        draft: "draft",
+        archived: "archived",
+        unlisted: "unlisted"
+      }, default: :draft
+
+      # Override setter to normalize upper-case GraphQL values ("ACTIVE" -> "active")
+      def status=(value)
+        super(value.to_s.downcase)
+      rescue ArgumentError
+        super("draft")
+      end
 
       # == Associations
       belongs_to :shop, class_name: "XEngine::Shopify::Shop", inverse_of: :products
-      belongs_to :featured_image, class_name: "XEngine::Shopify::ProductMedia", required: false
+      belongs_to :featured_image, 
+                 class_name: "XEngine::Shopify::MediaImage", 
+                 foreign_key: :featured_image_id, 
+                 optional: true
 
       has_and_belongs_to_many :tags, -> { distinct }, class_name: "XEngine::Shopify::Tag"
       has_and_belongs_to_many :collections, -> { distinct }, class_name: "XEngine::Shopify::Collection"
@@ -113,6 +135,7 @@ module XEngine
       has_many :product_media, class_name: "XEngine::Shopify::ProductMedia", through: :shop
 
       # == Validations
+      validates :shopify_id, presence: true, uniqueness: { scope: :shop_id }
       validates :handle, :title, presence: true
 
       # == Delegations

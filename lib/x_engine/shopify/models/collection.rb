@@ -42,8 +42,8 @@ module XEngine
       expose_graphql single: :collection, multiple: :collections do
         <<~GRAPHQL
           __typename
-          id: id 
-          legacy_id: legacyResourceId
+          id 
+          shopify_id: id
           title 
           handle 
           products_count: productsCount {

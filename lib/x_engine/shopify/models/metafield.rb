@@ -42,7 +42,7 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          legacy_id: legacyResourceId
+          shopify_id: id
           namespace
           key
           value

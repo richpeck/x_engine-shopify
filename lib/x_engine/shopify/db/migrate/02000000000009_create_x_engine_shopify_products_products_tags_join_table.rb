@@ -38,7 +38,7 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
       # 1. Foreign key pointing to the primary Product table
       # CRITICAL FIX: Cast to :bigint to match the Shopify numeric GID primary key
       t.references :product, 
-                   type: :bigint, 
+                   type: :uuid, 
                    null: false, 
                    foreign_key: { to_table: product_table, on_delete: :cascade }
 

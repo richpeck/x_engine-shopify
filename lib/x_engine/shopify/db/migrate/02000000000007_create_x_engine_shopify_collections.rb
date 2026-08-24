@@ -25,15 +25,15 @@
 # automated or manual product collections synchronized from the Shopify Admin API layer (+XEngine::Shopify::Collection+).
 #
 # == Schema Layout Matrix
-# [id]             The explicit numeric primary key overridden to store Shopify's GID integer directly.
 # [shop_id]        The reference link matching the owner store model.
+# [shopify_id]     The raw platform identifier returned from the Shopify GraphQL API.
 # [title]          The presentation title name text string for the resource.
 # [handle]         Unique string slug used for URL building and SEO routing lookups.
 # [body_html]      The raw description rich-text content payload string container.
 # [sort_order]     The default collection layout arrangement token string (e.g., <tt>"alpha-asc"</tt>).
 # [products_count] Cached calculation counter tracking total assigned child products.
 # [published_at]   Timestamp marker tracking exactly when the collection was exposed to sales channels.
-# [image_id]       Foreign key UUID reference pointing directly to the collection's primary decorative asset.
+# [image_id]       Numeric Shopify GID pointing directly to the collection's primary decorative asset.
 # [created_at]     Standard ActiveRecord timestamp.
 # [updated_at]     Standard ActiveRecord timestamp.
 #
@@ -43,6 +43,7 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
+
     # Allocate bigint to id column to override the global UUID default strategy.
     # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
     localized_options = table_options.merge(id: :bigint, default: nil)
@@ -50,6 +51,9 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
     create_table table_name, **localized_options do |t|
       
       t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
+
+      # Webhook & GraphQL Identifiers - UNIQUE index required for upsert_all conflict resolution
+      t.string :shopify_id, null: false, index: { unique: true, name: "idx_xe_shopify_collections_shopify_id" }
       
       # Core Text & Descriptive Attributes
       t.string  :title, null: false
@@ -62,13 +66,15 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
 
       # Media Assets & Timestamps
       t.datetime :published_at
-      t.references :image,
-                   type: :uuid,
-                   null: true,
-                   foreign_key: { to_table: media_table, on_delete: :nullify },
-                   index: true
+      
+      # Unconstrained bigint column to handle streaming GraphQL bulk payloads where
+      # Collection records land before their corresponding ProductMedia lines are parsed.
+      t.bigint   :image_id, null: true, index: true
 
       t.timestamps 
+
+      # Compound unique index for shopify_id scoped to shop context
+      t.index [:shopify_id, :shop_id], unique: true, name: "idx_xe_shopify_collections_shopify_shop"
 
       # Added to give us the ability to scope uniqueness safely around collection routing parameters per-tenant
       t.index [:shop_id, :handle], unique: true, name: "idx_xe_shopify_collections_shop_handle"
