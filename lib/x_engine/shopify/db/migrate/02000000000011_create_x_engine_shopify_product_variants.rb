@@ -45,17 +45,21 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    create_table table_name, **table_options do |t|
+    # Allocate bigint to id column to override the global UUID default strategy.
+    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
+    localized_options = table_options.merge(id: :bigint, default: nil)
+
+    create_table table_name, **localized_options do |t|
       
       # Core Structural Parent Links
       t.belongs_to :product,
-                   type: :uuid,
+                   type: :bigint,
                    foreign_key: { to_table: product_table, on_delete: :cascade },
                    null: false,
                    index: true
 
       t.references :featured_image,
-                   type: :uuid,
+                   type: :bigint,
                    null: true,
                    foreign_key: { to_table: media_table, on_delete: :nullify },
                    index: true

@@ -32,7 +32,7 @@ module XEngine
     # == Dual-Mode Request Dispatch
     # Like +BulkOperation+, this model implements a dual dispatch lifecycle via +#build_graphql_request+:
     # 1. *Un-synced (+shopify_id.blank?+):* Dispatches the +webhookSubscriptionCreate+ 
-    #    mutation payload along with the required topic and callback variables.
+    #    mutation payload along with the required topic, URI, fields, filter, and handleized name.
     # 2. *Synced (+shopify_id.present?+):* Delegates to standard +HasGraphQLRepresentation+ 
     #    to execute node status queries via +node(id: $id)+.
     #
@@ -151,12 +151,31 @@ module XEngine
         topic.to_s.tr("/", "_").upcase.presence
       end
 
+      # Sanitizes the internal display +name+ into a handleized format containing only lowercase 
+      # alphanumeric characters, underscores, and hyphens to satisfy Shopify API input validation.
+      #
+      # === Returns
+      # * [+String+, +nil+] Parameterized name string (e.g., +"my_webhook_store"+).
+      #
+      # === Examples
+      #   webhook.name = "My Webhook @ Store!"
+      #   webhook.graphql_name
+      #   # => "my_webhook_store"
+      #
+      def graphql_name
+        return if name.blank?
+
+        name.to_s
+            .parameterize(separator: "_")
+            .gsub(/[^a-zA-Z0-9_-]/, "")
+      end
+
       private
 
       # Generates the +webhookSubscriptionCreate+ GraphQL mutation tuple for creating a subscription on Shopify.
       #
       # === Returns
-      # * [+Array(String, Hash)+] Mutation GQL document and variables hash containing topic and endpoint details.
+      # * [+Array(String, Hash)+] Mutation GQL document and variables hash containing topic, URI, name, and optional parameters.
       # @api private
       #
       def build_creation_mutation
@@ -169,21 +188,9 @@ module XEngine
                 shopify_id: id
                 topic
                 filter
+                uri
                 fields: includeFields
                 created_at: createdAt
-                endpoint {
-                  __typename
-                  ... on WebhookHttpEndpoint {
-                    callbackUrl
-                  }
-                  ... on WebhookEventBridgeEndpoint {
-                    arn
-                  }
-                  ... on WebhookPubSubEndpoint {
-                    pubSubProject
-                    pubSubTopic
-                  }
-                }
               }
               userErrors {
                 field
@@ -196,7 +203,8 @@ module XEngine
         variables = {
           topic: graphql_topic_enum,
           subscription: {
-            httpDeliveryAddress: shop&.webhook_callback_url(topic),
+            name: graphql_name,
+            uri: shop&.webhook_callback_url(topic),
             includeFields: fields.presence,
             filter: filter.presence
           }.compact
