@@ -40,6 +40,7 @@ module XEngine
           __typename
           id
           shopify_id: id
+          legacy_id: legacyResourceId
           title
           position
           price

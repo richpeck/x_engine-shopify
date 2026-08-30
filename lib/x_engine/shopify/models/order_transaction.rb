@@ -42,6 +42,9 @@ module XEngine
           status
           gateway
           receiptJson
+          order {
+            id 
+          }
           amount: amountSet {
             shopMoney {
               amount
@@ -72,7 +75,7 @@ module XEngine
       belongs_to :order,
                  foreign_key: :order_id,
                  class_name: "XEngine::Shopify::Order",
-                 inverse_of: :order_transactions
+                 inverse_of: :transactions
 
       # ---
       # :section: Validations
