@@ -36,7 +36,11 @@ class CreateXEngineShopifyRefundLineItems < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    create_table table_name, **table_options do |t|
+    # Allocate bigint to id column to override the global UUID default strategy.
+    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
+    localized_options = table_options.merge(id: :bigint, default: nil)
+
+    create_table table_name, **localized_options do |t|
 
       # Strict relationship bindings to parent records
       t.belongs_to :refund,
