@@ -43,7 +43,7 @@ module XEngine
         <<~GRAPHQL
           __typename
           id 
-          shopify_id: id
+          legacy_id: legacyResourceId
           title 
           handle 
           products_count: productsCount {

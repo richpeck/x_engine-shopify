@@ -23,22 +23,22 @@
 # base product resources synchronized from the Shopify Admin API layer.
 #
 # == Schema Layout Matrix
-# [id]                 UUID primary key unique to the local engine instance.
-# [shop_id]            Foreign key UUID reference matching the owner store model context.
-# [shopify_id]         External Shopify Global Identifier (GID) or raw numeric API string.
-# [title]              The presentation title string for the product resource.
-# [handle]             String slug used for URL building and SEO routing lookups per store.
-# [description]        The raw HTML description payload string container.
-# [vendor]             The brand or manufacturing vendor identity tracking string.
-# [product_type]       Shopify's native high-level classification category descriptor token.
-# [status]             State tracking product visibility (e.g., active, draft, archived).
-# [price]              The decimal price valuation boundary for tracking transactional summaries.
-# [total_inventory]    The aggregate quantity calculation total across active tracking locations.
-# [tracks_inventory]   Boolean flag indicating whether the platform monitors allocation metrics.
-# [published_at]       Timestamp marker tracking when the product was published to the online channel.
-# [featured_image_id]  Numeric Shopify GID pointing directly to the product's primary media asset.
-# [created_at]         Standard ActiveRecord timestamp.
-# [updated_at]         Standard ActiveRecord timestamp.
+# [id]                UUID primary key unique to the local engine instance.
+# [shop_id]           Foreign key UUID reference matching the owner store model context.
+# [shopify_id]        External Shopify Global Identifier (GID) or raw numeric API string.
+# [title]             The presentation title string for the product resource.
+# [handle]            String slug used for URL building and SEO routing lookups per store.
+# [description]       The raw HTML description payload string container.
+# [vendor]            The brand or manufacturing vendor identity tracking string.
+# [product_type]      Shopify's native high-level classification category descriptor token.
+# [status]            State tracking product visibility (e.g., active, draft, archived).
+# [price]             The decimal price valuation boundary for tracking transactional summaries.
+# [total_inventory]   The aggregate quantity calculation total across active tracking locations.
+# [tracks_inventory]  Boolean flag indicating whether the platform monitors allocation metrics.
+# [published_at]      Timestamp marker tracking when the product was published to the online channel.
+# [featured_image_id] External Shopify Global Identifier (GID) string referencing the primary ProductMedia record.
+# [created_at]        Standard ActiveRecord timestamp.
+# [updated_at]        Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyProducts < XEngine::Core::Database::Migration
 
@@ -58,15 +58,13 @@ class CreateXEngineShopifyProducts < XEngine::Core::Database::Migration
                    null: false,
                    index: true
 
-      # Webhook & GraphQL Identifiers
-      t.string :shopify_id, null: true
-
       # Content & Categorization
       t.string :title,       null: false
       t.string :handle,      null: false, index: true
       t.text   :description  # Stores the description HTML payload
       t.string :vendor       # Stores brand/manufacturer
       t.string :product_type # Stores custom categorization
+      t.integer :media_count
 
       # Inventory, States, & Operational Metrics
       t.string  :status,          default: "draft"
@@ -77,14 +75,10 @@ class CreateXEngineShopifyProducts < XEngine::Core::Database::Migration
       # Associations & Publishing Metrics
       t.datetime :published_at # Tracks visibility timeline metrics
       
-      # Unconstrained bigint column to handle streaming GraphQL bulk payloads where
-      # Product records land before their corresponding ProductMedia lines are parsed.
-      t.bigint   :featured_image_id, null: true, index: true
+      # Associated primary product media asset UUID
+      t.bigint :featured_image_id, null: true, index: true
 
       t.timestamps
-
-      # Multi-tenant unique composite index for shop_id + shopify_id mapping
-      t.index [:shop_id, :shopify_id], unique: true, name: "idx_xe_shopify_products_shop_shopify_id"
     end
   end
 

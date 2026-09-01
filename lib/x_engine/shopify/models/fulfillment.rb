@@ -50,6 +50,9 @@ module XEngine
           legacy_id: legacyResourceId
           name
           status: displayStatus
+          order {
+            legacy_id: legacyResourceId
+          }
           tracking_company: trackingInfo {
             company
           }

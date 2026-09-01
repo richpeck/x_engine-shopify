@@ -51,10 +51,7 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
 
       t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
       t.belongs_to :product, type: :bigint, foreign_key: { to_table: product_table, on_delete: :cascade }, index: true, null: true
-
-      # Webhook & GraphQL Identifiers (GID string)
-      t.string :shopify_id, null: false
-
+      
       # STI Discriminator Column
       t.string :type, null: false, index: true
 
@@ -70,8 +67,6 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
 
       t.timestamps 
 
-      # Multi-tenant unique composite index for shop_id + shopify_id mapping
-      t.index [:shop_id, :shopify_id], unique: true, name: "idx_xe_shopify_product_media_shop_shopify_id"
     end
 
     add_index table_name, [:product_id, :type]

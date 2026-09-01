@@ -56,7 +56,6 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          shopify_id: id
           
           # 1. Standard 2D Graphical Images
           ... on MediaImage {

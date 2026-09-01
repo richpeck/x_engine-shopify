@@ -48,7 +48,11 @@ class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    create_table table_name, **table_options do |t|
+    # Allocate bigint to id column to override the global UUID default strategy.
+    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
+    localized_options = table_options.merge(id: :bigint, default: nil)
+
+    create_table table_name, **localized_options do |t|
 
       # Strict relationship bindings to parent shop record
       t.belongs_to :shop,
@@ -56,9 +60,6 @@ class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
                    foreign_key: { to_table: shop_table, on_delete: :cascade },
                    null: false,
                    index: true
-
-      # Webhook & GraphQL Identifiers
-      t.string :shopify_id, null: true
 
       # Platform Strings & Context Fields
       t.string :name
@@ -83,7 +84,6 @@ class CreateXEngineShopifyOrders < XEngine::Core::Database::Migration
       t.timestamps
 
       # Compound Scope Constraints & Indices for BulkUpsert
-      t.index [:shop_id, :shopify_id], unique: true, name: "idx_x_engine_shopify_orders_on_shop_and_shopify_id"
       t.index [:shop_id, :name],       unique: true, name: "idx_x_engine_shopify_orders_on_shop_and_name"
     end
   end

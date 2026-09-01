@@ -40,7 +40,7 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          shopify_id: id
+          legacy_id: legacyResourceId
           handle
           title
           tags
@@ -52,6 +52,9 @@ module XEngine
           tracks_inventory: tracksInventory
           created_at: createdAt
           published_at: publishedAt
+          media_count: mediaCount {
+            count 
+          }
           price: priceRangeV2 {
             min: minVariantPrice { amount }
             max: maxVariantPrice { amount }
@@ -118,9 +121,8 @@ module XEngine
 
       # == Associations
       belongs_to :shop, class_name: "XEngine::Shopify::Shop", inverse_of: :products
-      belongs_to :featured_image, 
-                 class_name: "XEngine::Shopify::MediaImage", 
-                 foreign_key: :featured_image_id, 
+      belongs_to :featured_image,
+                 class_name: "XEngine::Shopify::ProductMedia",
                  optional: true
 
       has_and_belongs_to_many :tags, -> { distinct }, class_name: "XEngine::Shopify::Tag"

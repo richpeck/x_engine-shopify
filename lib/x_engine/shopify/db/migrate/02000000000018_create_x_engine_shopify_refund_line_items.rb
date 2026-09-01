@@ -40,13 +40,13 @@ class CreateXEngineShopifyRefundLineItems < XEngine::Core::Database::Migration
 
       # Strict relationship bindings to parent records
       t.belongs_to :refund,
-                   type: :uuid,
+                   type: :bigint,
                    foreign_key: { to_table: refund_table, on_delete: :cascade },
                    null: false,
                    index: true
 
       t.belongs_to :line_item,
-                   type: :uuid,
+                   type: :bigint,
                    foreign_key: { to_table: line_item_table, on_delete: :cascade },
                    null: false,
                    index: true

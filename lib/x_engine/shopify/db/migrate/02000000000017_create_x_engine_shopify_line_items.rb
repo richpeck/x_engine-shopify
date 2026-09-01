@@ -51,14 +51,14 @@ class CreateXEngineShopifyLineItems < XEngine::Core::Database::Migration
 
       # Strict relationship bindings to parent order record
       t.belongs_to :order,
-                   type: :uuid,
+                   type: :bigint,
                    foreign_key: { to_table: order_table, on_delete: :cascade },
                    null: false,
                    index: true
 
       # Loose associations to bypass constraints when remote records don't match local database timeline boundaries
-      t.belongs_to :product, type: :uuid, index: true, foreign_key: false
-      t.belongs_to :product_variant, type: :uuid, index: true, foreign_key: false
+      t.belongs_to :product, type: :bigint, index: true, foreign_key: false
+      t.belongs_to :product_variant, type: :bigint, index: true, foreign_key: false
 
       # String & Ingress Descriptors
       t.string  :title

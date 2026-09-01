@@ -64,9 +64,6 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
                    foreign_key: { to_table: media_table, on_delete: :nullify },
                    index: true
 
-      # Webhook & GraphQL Identifiers
-      t.string :shopify_id, null: true, index: { unique: true, name: "idx_xe_shopify_variants_shopify_id" }
-
       # Variant Identification Parameters
       t.string  :title, null: false
       t.string  :sku

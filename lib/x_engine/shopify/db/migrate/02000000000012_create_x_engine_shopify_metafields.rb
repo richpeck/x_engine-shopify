@@ -38,12 +38,11 @@ class CreateXEngineShopifyMetafields < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    # Force primary_key: false so we can declare our explicit :id column type manually
-    localized_options = table_options.merge(id: false)
+    # Allocate bigint to id column to override the global UUID default strategy.
+    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
+    localized_options = table_options.merge(id: :bigint, default: nil)
 
     create_table table_name, **localized_options do |t|
-      # Primary Key matching Shopify's naked numeric GraphQL GID
-      t.bigint :id, null: false, primary_key: true
 
       # Parent Store Association Scope Boundary
       t.belongs_to :shop, 

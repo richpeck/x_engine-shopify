@@ -39,13 +39,15 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          shopify_id: id
           legacy_id: legacyResourceId
           title
           position
           price
           sku
           barcode
+          product_id: product {
+            id: legacyResourceId
+          }
           inventory_policy: inventoryPolicy
           inventory_quantity: inventoryQuantity
           selectedOptions {

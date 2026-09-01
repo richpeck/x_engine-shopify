@@ -19,20 +19,17 @@
 # frozen_string_literal: true
 
 require "dry-configurable"
-require "active_support/core_ext/string/inflections"
 
 module XEngine
   module Shopify
     # = XEngine Shopify Client Orchestrator
     #
-    # Encapsulates authentication context boundaries, version targets, interpolation settings,
-    # and functional API scope definitions mapping application workflows onto the Shopify Partner ecosystem.
+    # Encapsulates authentication context boundaries, version targets, and functional
+    # API scope definitions mapping application workflows onto the Shopify Partner ecosystem.
     #
     # == Container Registration
     # Rather than managing configuration globally via class-level constants, instances of this class 
     # are instantiated and managed directly within an IoC container (e.g. +XEngine::Application["shopify"]+).
-    # This allows downstream parent applications to dynamically configure API settings via 
-    # blocks directly exposed by the container interface.
     #
     # === Target Block Interface Example
     #
@@ -41,9 +38,6 @@ module XEngine
     #     config.api_secret = "shpss_abc456..."
     #     config.app_domain = "https://app.example.com"
     #     config.scopes     = ["read_products", "write_inventory", "read_orders"]
-    #
-    #     # Mutating interpolation custom rules cleanly via Hash access or replacement:
-    #     config.interpolation.custom_rules[:handle] = ->(val) { val.to_s.downcase.strip }
     #   end
     #
     class Client
@@ -79,96 +73,7 @@ module XEngine
       # @return [String]
       setting :api_version, default: ENV.fetch("XENGINE_SHOPIFY_API_VERSION", "2026-04")
 
-      # = Interpolation Configuration Boundaries
-      # Configures key/value transformations executed by the +JSONInterpolator+ node.
-      setting :interpolation do
-        # @!attribute [rw] strip_gids
-        # Automatically extracts numeric/string identifiers from raw GraphQL GIDs.
-        # @return [Boolean]
-        setting :strip_gids, default: true
-
-        # @!attribute [rw] parse_timestamps
-        # Converts ISO8601 string values matching UTC timestamps into native +Time+ objects.
-        # @return [Boolean]
-        setting :parse_timestamps, default: true
-
-        # @!attribute [rw] type_mappings
-        # Registry mapping incoming GraphQL +__typename+ identifiers to fully-qualified 
-        # local domain or ActiveRecord model class strings.
-        # @return [Hash{String => String}]
-        setting :type_mappings, default: {
-          "Collection"     => "XEngine::Shopify::Collection",
-          "Product"        => "XEngine::Shopify::Product",
-          "ProductVariant" => "XEngine::Shopify::ProductVariant",
-          "MediaImage"     => "XEngine::Shopify::ProductImage",
-          "Video"          => "XEngine::Shopify::ProductVideo"
-        }
-
-        # @!attribute [rw] field_mappings
-        # Model-specific column alias dictionary. Maps GraphQL camelCase keys or 
-        # parent line-item fields directly to target database attribute names.
-        # @return [Hash{String => Hash{String => String}}]
-        setting :field_mappings, default: {
-          "XEngine::Shopify::Collection" => {
-            "legacyResourceId" => "legacy_id",
-            "productsCount"    => "products_count"
-          },
-          "XEngine::Shopify::Product" => {
-            "legacyResourceId" => "legacy_id",
-            "totalInventory"   => "total_inventory",
-            "totalVariants"    => "total_variants",
-            "productType"      => "product_type"
-          },
-          "XEngine::Shopify::ProductVariant" => {
-            "legacyResourceId"  => "legacy_id",
-            "inventoryQuantity" => "inventory_quantity",
-            "parent_id"         => "product_id"
-          },
-          "XEngine::Shopify::ProductImage" => {
-            "parent_id" => "product_id"
-          }
-        }
-
-        # @!attribute [rw] fragment_unwrappers
-        # List of callable Procs/lambdas executed sequentially to unroll nested GraphQL 
-        # sub-fragments into flat attributes.
-        # @return [Array<Proc>]
-        setting :fragment_unwrappers, default: [
-          lambda { |raw|
-            if raw["image"].is_a?(Hash)
-              img = raw.delete("image")
-              raw["url"]    ||= img["url"]
-              raw["height"] ||= img["height"]
-              raw["width"]  ||= img["width"]
-              raw["alt"]    ||= img["altText"]
-            end
-            raw
-          },
-          lambda { |raw|
-            if raw["originalSource"].is_a?(Hash)
-              src = raw.delete("originalSource")
-              raw["url"]    ||= src["url"]
-              raw["height"] ||= src["height"]
-              raw["width"]  ||= src["width"]
-            end
-            raw
-          }
-        ]
-
-        # @!attribute [rw] custom_rules
-        # Hash mapping snakified key symbols to executable lambdas or callables for targeted field transformations.
-        # @return [Hash{Symbol => Proc}]
-        setting :custom_rules, constructor: ->(rules) {
-          return {} unless rules.respond_to?(:each_pair)
-
-          rules.each_pair.with_object({}) do |(key, fn), acc|
-            acc[key.to_s.underscore.to_sym] = fn
-          end
-        }
-      end
-
       # Overrides the standard +config+ method signature to intercept and yield configuration blocks.
-      # This provides an intuitive object DSL interface for parent initializers to quickly configure settings.
       #
       # @yieldparam config [Dry::Configurable::Config] The active instance configuration state proxy object.
       # @return [Dry::Configurable::Config] The configuration manager instance.
@@ -199,9 +104,6 @@ module XEngine
       end
 
       # Creates an authenticated Shopify transient user or app session context.
-      #
-      # Used primarily inside functional nodes or background jobs to build localized 
-      # API scopes dynamically using stored domain access tokens.
       #
       # @param shop [String] The target shop domain name (e.g., "example.myshopify.com").
       # @param token [String] The offline or online access token for the target shop.

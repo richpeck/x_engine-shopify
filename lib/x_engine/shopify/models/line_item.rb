@@ -51,10 +51,19 @@ module XEngine
           title
           quantity
           sku
+          product {
+            id: legacyResourceId
+          }
           variant {
-            id
+            id: legacyResourceId
             sku
             title
+            inventoryItem {
+              cost_price: unitCost {
+                amount
+              }
+              country_of_origin: 	countryCodeOfOrigin
+            }
           }
           originalUnitPriceSet {
             shopMoney {
@@ -70,13 +79,6 @@ module XEngine
           }
         GRAPHQL
       end
-
-      # Attribute type transformations applied during GraphQL response hydration
-      graphql_attribute_transforms(
-        price: :to_d,
-        discounted_price: :to_d,
-        quantity: :to_i
-      )
 
       # =========================================================================
       # :section: Associations

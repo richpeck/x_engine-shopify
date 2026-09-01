@@ -31,12 +31,8 @@ class CreateXEngineShopifyProductsProductsTagsJoinTable < XEngine::Core::Databas
   #
   # @return [void]
   def up
-    # Force id: false to eliminate standard auto-incrementing / UUID primary key blocks
-    localized_options = table_options.merge(id: false)
-
-    create_table table_name, **localized_options do |t|
+    create_table table_name, **table_options do |t|
       # 1. Foreign key pointing to the primary Product table
-      # CRITICAL FIX: Cast to :bigint to match the Shopify numeric GID primary key
       t.references :product, 
                    type: :bigint, 
                    null: false, 

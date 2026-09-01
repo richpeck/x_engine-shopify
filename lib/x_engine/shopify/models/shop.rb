@@ -42,7 +42,8 @@ module XEngine
       expose_graphql single: :shop do
         <<~GRAPHQL
           __typename
-          shopify_id:       id
+          id
+          shopify_id: id
           name
           email
           url

@@ -36,8 +36,8 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          shopify_id: id
           name
+          legacy_id: legacyResourceId
           created_at: createdAt
           payment_gateways: paymentGatewayNames
           shipping_country: shippingAddress {

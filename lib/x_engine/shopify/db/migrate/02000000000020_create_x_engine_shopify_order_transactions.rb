@@ -53,7 +53,6 @@ class CreateXEngineShopifyOrderTransactions < XEngine::Core::Database::Migration
       t.string :kind
       t.string :status
       t.string :gateway
-      t.string :transaction_id
 
       # Financial Values
       t.decimal :amount, precision: 10, scale: 2, default: 0.00, null: false

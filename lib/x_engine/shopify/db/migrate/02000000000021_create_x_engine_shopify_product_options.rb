@@ -57,9 +57,6 @@ class CreateXEngineShopifyProductOptions < XEngine::Core::Database::Migration
                    null: true,
                    index: true
 
-      # Platform identifier
-      t.string :shopify_id, null: false
-
       # Option Attributes & Display Positioning
       t.string  :name,     null: false
       t.integer :position, null: false, default: 1

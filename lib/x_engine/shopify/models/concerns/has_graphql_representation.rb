@@ -110,8 +110,26 @@ module XEngine
         class_label   = self.class.name.demodulize
         op_type       = use_mutation ? "mutation" : "query"
 
-        if respond_to?(:shopify_id) && shopify_id.present?
-          formatted_gid = ensure_shopify_gid(shopify_id, class_label)
+        # Singleton endpoints in Shopify GraphQL (e.g. `shop`) do not take an `id` argument
+        is_singleton  = endpoint.to_s == "shop"
+
+        raw_id = if respond_to?(:shopify_id) && public_send(:shopify_id).present?
+                  public_send(:shopify_id)
+                elsif respond_to?(:id) && public_send(:id).present?
+                  public_send(:id)
+                end
+
+        if is_singleton
+          query = <<~GRAPHQL
+            #{op_type} fetch#{class_label} {
+              #{endpoint} {
+                #{query_fields}
+              }
+            }
+          GRAPHQL
+          variables = {}
+        elsif raw_id.present?
+          formatted_gid = ensure_shopify_gid(raw_id, class_label)
 
           query = <<~GRAPHQL
             #{op_type} fetch#{class_label}($id: ID!) {
@@ -122,14 +140,7 @@ module XEngine
           GRAPHQL
           variables = { id: formatted_gid }
         else
-          query = <<~GRAPHQL
-            #{op_type} fetch#{class_label} {
-              #{endpoint} {
-                #{query_fields}
-              }
-            }
-          GRAPHQL
-          variables = {}
+          raise ArgumentError, "Cannot execute single-resource GraphQL query for #{class_label}: `id` is missing or blank on #{inspect}."
         end
 
         [query, variables]
