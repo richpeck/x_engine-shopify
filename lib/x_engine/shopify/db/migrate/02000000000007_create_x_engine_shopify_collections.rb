@@ -59,9 +59,6 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
 
       # Aggregations & Counters
       t.integer :products_count, default: 0, null: false
-
-      # Media Assets & Timestamps
-      t.datetime :published_at
       
       # Unconstrained bigint column to handle streaming GraphQL bulk payloads where
       # Collection records land before their corresponding ProductMedia lines are parsed.

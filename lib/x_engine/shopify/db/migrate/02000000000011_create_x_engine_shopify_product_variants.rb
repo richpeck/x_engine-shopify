@@ -58,12 +58,6 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
                    null: false,
                    index: true
 
-      t.references :featured_image,
-                   type: :bigint,
-                   null: true,
-                   foreign_key: { to_table: media_table, on_delete: :nullify },
-                   index: true
-
       # Variant Identification Parameters
       t.string  :title, null: false
       t.string  :sku

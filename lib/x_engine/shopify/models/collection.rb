@@ -49,6 +49,13 @@ module XEngine
           products_count: productsCount {
             count
           }
+          body_html: descriptionHtml
+
+          sort_order: sortOrder
+
+          image {
+            id
+          }
         GRAPHQL
       end
 

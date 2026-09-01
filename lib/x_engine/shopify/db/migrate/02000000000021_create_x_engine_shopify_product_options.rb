@@ -64,9 +64,6 @@ class CreateXEngineShopifyProductOptions < XEngine::Core::Database::Migration
       t.timestamps
     end
 
-    # Compound unique index for shopify_id scoped to shop context
-    add_index table_name, [:shopify_id, :shop_id], unique: true
-
     # Compound index for position sorting lookups within product context
     add_index table_name, [:product_id, :position]
   end

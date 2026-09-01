@@ -44,6 +44,7 @@ module XEngine
             countryCodeV2
           }
           currency: currencyCode
+		      line_items_count: subtotalLineItemsQuantity 
           fulfillment_status: displayFulfillmentStatus
           financial_status: displayFinancialStatus
           subtotal: subtotalPriceSet {

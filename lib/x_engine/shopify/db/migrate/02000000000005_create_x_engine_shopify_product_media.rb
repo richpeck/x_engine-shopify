@@ -60,7 +60,6 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
       t.integer :height
       t.integer :width
       t.string  :alt
-      t.integer :position
 
       # Open tracking config block consistent with engine schemas
       t.json :meta, default: {}, null: false
