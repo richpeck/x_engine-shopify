@@ -74,7 +74,7 @@ module XEngine
 
       # == Associations
       belongs_to :product, class_name: "XEngine::Shopify::Product", inverse_of: :variants
-      belongs_to :featured_image, class_name: "XEngine::Shopify::ProductMedia", required: false
+      belongs_to :featured_image, class_name: "XEngine::Shopify::ProductMedia", foreign_key: :featured_media_id, required: false
 
       has_one :shop, through: :product, class_name: "XEngine::Shopify::Shop"
 
