@@ -125,7 +125,7 @@ module XEngine
                  class_name: "XEngine::Shopify::ProductMedia",
                  optional: true
 
-      has_and_belongs_to_many :tags, -> { distinct }, class_name: "XEngine::Shopify::Tag"
+      has_many :product_tags, class_name: "XEngine::Shopify::ProductTag", dependent: :destroy, inverse_of: :product
       has_and_belongs_to_many :collections, -> { distinct }, class_name: "XEngine::Shopify::Collection"
 
       has_many :line_items, class_name: "XEngine::Shopify::LineItem", inverse_of: :product
@@ -144,6 +144,11 @@ module XEngine
       delegate :url, to: :featured_image, prefix: true, allow_nil: true
 
       # == Scopes
+      # Filter products containing a specific tag string
+      scope :with_tag, ->(tag_name) {
+        joins(:product_tags).where(shopify_product_tags: { name: tag_name })
+      }
+
       # Compiles a local, source-of-truth availability check bypassing unstable platform cached states.
       scope :available, ->(direction = true) {
         if direction
@@ -152,6 +157,11 @@ module XEngine
           where(tracks_inventory: true).where("total_inventory <= 0")
         end
       }
+
+      # Helper method to retrieve array of tag name strings directly
+      def tags
+        product_tags.pluck(:name)
+      end
     end
   end
 end

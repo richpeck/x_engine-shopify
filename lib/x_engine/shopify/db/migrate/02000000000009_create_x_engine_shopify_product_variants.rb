@@ -23,10 +23,9 @@
 # distinct sellable stock-keeping items synchronized from the Shopify Admin API layer (+XEngine::Shopify::ProductVariant+).
 #
 # == Schema Layout Matrix
-# [id]                 UUID primary key unique to the local engine instance.
-# [product_id]         Foreign key UUID reference matching the parent catalog product model.
-# [shopify_id]         External Shopify Global Identifier (GID) or raw numeric API string.
-# [featured_image_id]  Foreign key UUID reference pointing directly to the variant's primary media asset.
+# [id]                 Bigint primary key matching the naked numeric Shopify GID identifier.
+# [shop_id]            Foreign key UUID reference matching the owner store model context.
+# [product_id]         Foreign key bigint reference matching the parent catalog product model.
 # [title]              Used to explain what specific choice format the variant represents.
 # [sku]                Stock keeping unit alphanumeric tracker string used for third-party logistics.
 # [barcode]            Product barcode identifier string.
@@ -51,7 +50,13 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
 
     create_table table_name, **localized_options do |t|
       
-      # Core Structural Parent Links
+      # Multi-Tenant & Core Structural Parent Links
+      t.belongs_to :shop,
+                   type: :uuid,
+                   foreign_key: { to_table: shop_table, on_delete: :cascade },
+                   null: false,
+                   index: true
+
       t.belongs_to :product,
                    type: :bigint,
                    foreign_key: { to_table: product_table, on_delete: :cascade },
@@ -77,6 +82,9 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
 
       # Indexes to guarantee rapid warehouse tracking operations
       t.index :sku, name: "idx_xe_shopify_variants_sku"
+
+      # Compound multi-tenant lookup index matching Shopify ingress requirements
+      t.index [:shop_id, :id], unique: true, name: "index_#{table_name}_on_shop_id_and_id"
     end
   end
 
@@ -87,6 +95,13 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
   # @return [String]
   def table_name
     @table_name ||= XEngine::Shopify::ProductVariant.table_name
+  end
+
+  # Resolves the fully namespaced physical table string value for the parent +Shop+ resource.
+  #
+  # @return [String]
+  def shop_table
+    @shop_table ||= XEngine::Shopify::Shop.table_name
   end
 
   # Resolves the fully namespaced physical table string value for the parent +Product+ resource.

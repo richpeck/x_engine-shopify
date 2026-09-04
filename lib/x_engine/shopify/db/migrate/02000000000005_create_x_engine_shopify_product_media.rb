@@ -66,6 +66,9 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
 
       t.timestamps 
 
+      # Compound multi-tenant lookup index matching Shopify ingress requirements
+      t.index [:shop_id, :id], unique: true, name: "index_#{table_name}_on_shop_id_and_id"
+
     end
 
     add_index table_name, [:product_id, :type]

@@ -68,13 +68,15 @@ module XEngine
       belongs_to :product, class_name: "XEngine::Shopify::Product", inverse_of: :variants
       belongs_to :featured_image, class_name: "XEngine::Shopify::ProductMedia", required: false
 
+      has_one :shop, through: :product, class_name: "XEngine::Shopify::Shop"
+
       has_many :options, class_name: "XEngine::Shopify::VariantOption", dependent: :destroy
       has_many :line_items, class_name: "XEngine::Shopify::LineItem", foreign_key: "product_variant_id", inverse_of: :variant
 
       has_many :orders, class_name: "XEngine::Shopify::Order", through: :line_items
 
       # == Delegations
-      delegate :shop, to: :product
+      delegate :shop, :shop_id, to: :product, allow_nil: true
       delegate :url, to: :featured_image, prefix: true, allow_nil: true
     end
   end

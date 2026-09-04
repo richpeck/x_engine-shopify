@@ -25,10 +25,10 @@
 # automated or manual product collections synchronized from the Shopify Admin API layer (+XEngine::Shopify::Collection+).
 #
 # == Schema Layout Matrix
+# [id]             Bigint primary key matching the naked numeric Shopify GID identifier.
 # [shop_id]        The reference link matching the owner store model.
-# [shopify_id]     The raw platform identifier returned from the Shopify GraphQL API.
 # [title]          The presentation title name text string for the resource.
-# [handle]         Unique string slug used for URL building and SEO routing lookups.
+# [handle]         String slug used for URL building and SEO routing lookups.
 # [body_html]      The raw description rich-text content payload string container.
 # [sort_order]     The default collection layout arrangement token string (e.g., <tt>"alpha-asc"</tt>).
 # [products_count] Cached calculation counter tracking total assigned child products.
@@ -53,7 +53,7 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
 
       # Core Text & Descriptive Attributes
       t.string  :title, null: false
-      t.string  :handle, null: false
+      t.string  :handle, null: false, index: true
       t.text    :body_html
       t.string  :sort_order
 
@@ -66,8 +66,8 @@ class CreateXEngineShopifyCollections < XEngine::Core::Database::Migration
 
       t.timestamps 
 
-      # Added to give us the ability to scope uniqueness safely around collection routing parameters per-tenant
-      t.index [:shop_id, :handle], unique: true, name: "idx_xe_shopify_collections_shop_handle"
+      # Compound multi-tenant lookup index matching Shopify ingress requirements
+      t.index [:shop_id, :id], unique: true, name: "index_#{table_name}_on_shop_id_and_id"
 
     end
   end

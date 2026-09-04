@@ -32,7 +32,10 @@ class CreateXEngineShopifyProductsCollectionsJoinTable < XEngine::Core::Database
   #
   # @return [void]
   def up
-    create_table table_name, **table_options do |t|
+    # Disable the global UUID primary key strategy for HABTM bridge tables
+    localized_options = table_options.merge(id: false)
+
+    create_table table_name, **localized_options do |t|
       
       # 1. Foreign key pointing to the Product table (CRITICAL: Must be :bigint to match Shopify's naked ID)
       t.references :product,
@@ -46,21 +49,32 @@ class CreateXEngineShopifyProductsCollectionsJoinTable < XEngine::Core::Database
                    null: false,
                    foreign_key: { to_table: collection_table, on_delete: :cascade }
 
-      # 3. Composite index optimizing fast bidirectional filtering lookups
+      # 3. Composite index optimizing fast forward filtering lookups
       t.index [:product_id, :collection_id],
               name: "idx_xe_shopify_prod_colls_poly",
               unique: true
 
+      # 4. Composite index optimizing fast reverse filtering lookups
+      t.index [:collection_id, :product_id],
+              name: "idx_xe_shopify_colls_prod_poly"
+
     end
+  end
+
+  # Reverts schema transformations by dropping the join table.
+  #
+  # @return [void]
+  def down
+    drop_table table_name, if_exists: true
   end
 
   private
 
   # Resolves the database target table directly from the model class or fallback convention.
   #
-  # @return [String]
+  # @return [Symbol]
   def table_name
-    @table_name ||= :shopify_collections_products
+    :shopify_collections_products
   end
 
   # Resolves the fully namespaced physical table string value for the Product resource.
