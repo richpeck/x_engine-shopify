@@ -78,6 +78,10 @@ class CreateXEngineShopifyProductVariants < XEngine::Core::Database::Migration
       t.integer :inventory_quantity, default: 0
       t.string  :country_of_origin
 
+      # Media Pointer
+      # Use a loose bigint pointer instead of foreign_key: true to prevent JSONL parsing order blocks
+      t.bigint  :featured_media_id, index: true
+
       t.timestamps
 
       # Indexes to guarantee rapid warehouse tracking operations

@@ -54,6 +54,14 @@ module XEngine
             name
             value
           }
+          media(first: 1) {
+            edges {
+              node {
+                __typename
+                id
+              }
+            }
+          }
           inventoryItem {
             country_of_origin: countryCodeOfOrigin
             cost_price: unitCost {

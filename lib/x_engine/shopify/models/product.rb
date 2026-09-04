@@ -92,14 +92,7 @@ module XEngine
               }
             }
           }
-          
-          metafields(first: 250) {
-            edges {
-              node {
-                #{XEngine::Shopify::Metafield.graphql_query}
-              }
-            }
-          }
+      
         GRAPHQL
       end
 
