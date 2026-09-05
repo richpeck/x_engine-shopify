@@ -97,7 +97,8 @@ module XEngine
       # == Associations
       belongs_to :shop, class_name: "XEngine::Shopify::Shop", inverse_of: :product_media
 
-      has_and_belongs_to_many :products, -> { distinct }, class_name: "XEngine::Shopify::Product"
+      # Polymorphic ownership (associates with Product or ProductVariant)
+      belongs_to :mediable, polymorphic: true, optional: true
 
       # == Scopes
       

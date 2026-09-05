@@ -43,36 +43,42 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
   # @return [void]
   def up 
 
-    # Allocate bigint to id column to override the global UUID default strategy.
-    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
-    localized_options = table_options.merge(id: :bigint, default: nil)
+      # Allocate bigint to id column to override the global UUID default strategy.
+      # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
+      localized_options = table_options.merge(id: :bigint, default: nil)
 
-    create_table table_name, **localized_options do |t|
+      create_table table_name, **localized_options do |t|
 
-      t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
-      t.belongs_to :product, type: :bigint, foreign_key: { to_table: product_table, on_delete: :cascade }, index: true, null: true
-      
-      # STI Discriminator Column
-      t.string :type, null: false, index: true
+        t.belongs_to :shop, type: :uuid, foreign_key: { to_table: shop_table, on_delete: :cascade }, null: false, index: true
+        
+        # Polymorphic Association (associates with both Product and ProductVariant)
+        t.references :mediable, polymorphic: true, type: :bigint, index: false, null: true
 
-      # Core Media Attributes
-      t.string  :url
-      t.integer :height
-      t.integer :width
-      t.string  :alt
+        # STI Discriminator Column
+        t.string :type, null: false, index: true
 
-      # Open tracking config block consistent with engine schemas
-      t.json :meta, default: {}, null: false
+        # Core Media Attributes
+        t.string  :url
+        t.integer :height
+        t.integer :width
+        t.string  :alt
 
-      t.timestamps 
+        # Open tracking config block consistent with engine schemas
+        t.json :meta, default: {}, null: false
 
-      # Compound multi-tenant lookup index matching Shopify ingress requirements
-      t.index [:shop_id, :id], unique: true, name: "index_#{table_name}_on_shop_id_and_id"
+        t.timestamps 
 
+        # Compound index for polymorphic parent lookups
+        t.index [:mediable_type, :mediable_id], name: "index_#{table_name}_on_mediable"
+
+        # Compound multi-tenant lookup index (includes mediable_type/id to prevent PK collisions 
+        # when the same Shopify Media ID is attached to both a Product and a ProductVariant)
+        t.index [:shop_id, :id, :mediable_type, :mediable_id], unique: true, name: "index_#{table_name}_on_shop_id_and_id_and_mediable"
+
+      end
+
+      add_index table_name, [:mediable_id, :mediable_type, :type], name: "index_#{table_name}_on_mediable_and_type"
     end
-
-    add_index table_name, [:product_id, :type]
-  end
 
   private
 
@@ -88,13 +94,6 @@ class CreateXEngineShopifyProductMedia < XEngine::Core::Database::Migration
   # @return [String]
   def shop_table
     @shop_table ||= XEngine::Shopify::Shop.table_name
-  end
-
-  # Resolves the fully namespaced physical table string value for the parent +Product+ resource.
-  #
-  # @return [String]
-  def product_table
-    @product_table ||= XEngine::Shopify::Product.table_name
   end
 
 end

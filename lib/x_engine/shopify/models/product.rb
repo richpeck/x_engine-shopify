@@ -127,7 +127,12 @@ module XEngine
       has_many :metafields, class_name: "XEngine::Shopify::Metafield", dependent: :destroy, as: :objectable
 
       has_many :orders, class_name: "XEngine::Shopify::Order", through: :line_items
-      has_many :product_media, class_name: "XEngine::Shopify::ProductMedia", through: :shop
+
+      # Direct polymorphic media association scoped to Product records
+      has_many :product_media,
+               as: :mediable,
+               class_name: "XEngine::Shopify::ProductMedia",
+               dependent: :destroy
 
       # == Validations
       validates :shopify_id, presence: true, uniqueness: { scope: :shop_id }

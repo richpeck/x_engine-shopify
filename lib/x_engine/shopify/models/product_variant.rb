@@ -54,11 +54,10 @@ module XEngine
             name
             value
           }
-          media(first: 1) {
+          media(first: 250) {
             edges {
               node {
-                __typename
-                id
+                #{XEngine::Shopify::ProductMedia.graphql_query}
               }
             }
           }
@@ -82,6 +81,12 @@ module XEngine
       has_many :line_items, class_name: "XEngine::Shopify::LineItem", foreign_key: "product_variant_id", inverse_of: :variant
 
       has_many :orders, class_name: "XEngine::Shopify::Order", through: :line_items
+
+      # Direct polymorphic media association scoped to Product records
+      has_many :product_media,
+               as: :mediable,
+               class_name: "XEngine::Shopify::ProductMedia",
+               dependent: :destroy
 
       # == Delegations
       delegate :shop, :shop_id, to: :product, allow_nil: true
