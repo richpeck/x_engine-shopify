@@ -42,7 +42,6 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          shopify_id: id
           namespace
           key
           value

@@ -135,7 +135,6 @@ module XEngine
                dependent: :destroy
 
       # == Validations
-      validates :shopify_id, presence: true, uniqueness: { scope: :shop_id }
       validates :handle, :title, presence: true
 
       # == Delegations

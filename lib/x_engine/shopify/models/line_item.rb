@@ -91,6 +91,12 @@ module XEngine
                  inverse_of: :line_items, 
                  required: true
 
+      # @!attribute shop
+      #   @return [XEngine::Shopify::Shop, nil] The storefront merchant record owning this order line item.
+      has_one :shop,
+              through: :order,
+              class_name: "XEngine::Shopify::Shop"
+
       # @!attribute product
       #   @return [XEngine::Shopify::Product, nil] The catalog product record associated with this item.
       belongs_to :product, 
