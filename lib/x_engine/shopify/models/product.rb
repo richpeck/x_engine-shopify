@@ -135,7 +135,7 @@ module XEngine
                dependent: :destroy
 
       # == Validations
-      validates :handle, :title, presence: true
+      validates :handle, :title, presence: true, on: :create
 
       # == Delegations
       delegate :url, to: :featured_image, prefix: true, allow_nil: true

@@ -47,7 +47,7 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
   def up 
     create_table table_name, **table_options do |t|
 
-      # Define the reference column explicitly as a UUID at the macro level
+      # Belonging Shop (UUID Scope)
       t.belongs_to :shop, 
                    type: :uuid, 
                    foreign_key: { to_table: shop_table, on_delete: :cascade }, 
@@ -57,22 +57,23 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
       # Metadata & Human Interface
       t.string :name, null: true
 
-      # Shopify Specifics
-      t.string :shopify_id, index: { unique: true }
+      # Shopify Remote Identity & Settings
+      t.string :shopify_id, null: true, index: { unique: true }
       t.string :topic, null: false, index: true
-      t.string :uri, null: true
+      t.text   :uri, null: true
+      t.string :api_version, null: true
       
-      # Payload Optimization & Filtering
-      t.string :filter, null: true
-      t.string :fields, null: true
+      # Payload Filtering & Query Optimizations
+      t.text   :filter, null: true
+      t.text   :fields, null: true
 
       # State & Operational Tracking
       t.text   :notes
 
       t.timestamps
 
-      # Multi-column index for uniqueness and scoped lookups
-      t.index [:shop_id, :topic], unique: true, name: "idx_shopify_webhooks_on_shop_and_topic"
+      # Compound index supporting multi-endpoint configurations per topic
+      t.index [:shop_id, :topic, :uri], unique: true, name: "idx_shopify_webhooks_shop_topic_uri"
     end
   end
 
