@@ -25,7 +25,7 @@ module XEngine
     # associations, and global filter rules consumed by the frontend Refine dashboard components (+GenericList+).
     #
     # @see RefineSchema
-    class WebhookSubscription
+    class WebhookSubscription < XEngine::Core::Model
       include XInventory::Concerns::ParamsSchema
       include XInventory::Concerns::RefineSchema
       include Concerns::SerializableModel
