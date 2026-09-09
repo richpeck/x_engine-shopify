@@ -174,15 +174,25 @@ module XEngine
 
       # Generates the fully-qualified HTTPS callback URL for webhook ingestion.
       #
-      # Translates the target resource (e.g., +"products/update"+ -> +"products"+) to match
-      # the engine's standard webhook ingress routing table:
+      # Translates the target resource or topic string (e.g., +"PRODUCTS_UPDATE"+ or +"products/update"+ -> +"products"+)
+      # to match the engine's standard webhook ingress routing table:
       #   <app_domain>/api/v1/:resource/webhook
       #
-      # @param topic_or_resource [String, Symbol, nil] Optional wire topic (e.g., +"products/update"+) or resource identifier.
+      # @param topic_or_resource [String, Symbol, nil] Optional topic (e.g., +"PRODUCTS_UPDATE"+, +"products/update"+) or resource identifier.
       # @return [String] Fully qualified HTTPS callback URI (e.g., +"https://app.example.com/api/v1/products/webhook"+).
       #
       def webhook_callback_url(topic_or_resource = nil)
-        resource = topic_or_resource.to_s.split("/").first.presence&.downcase || "webhooks"
+        raw_string = topic_or_resource.to_s.downcase
+
+        # Extract primary resource token across GQL Enums (PRODUCTS_UPDATE), REST topics (products/update), or raw names
+        resource = if raw_string.include?("/")
+                     raw_string.split("/").first
+                   elsif raw_string.include?("_")
+                     raw_string.split("_").first
+                   else
+                     raw_string
+                   end.presence || "webhooks"
+
         client = XEngine::Application["shopify"] rescue XEngine::Shopify::Client.new
         
         client.callback_url_for("api/v1/#{resource}/webhook")
