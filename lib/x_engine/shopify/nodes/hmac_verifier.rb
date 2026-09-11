@@ -46,16 +46,16 @@ module XEngine
         #
         def call(env:, body: "", **)
           rack_env = env.transform_keys(&:upcase)
-          shop_domain = rack_env["HTTP_X_SHOPIFY_SHOP_DOMAIN"]
+          raw_domain = rack_env["HTTP_X_SHOPIFY_SHOP_DOMAIN"]
           hmac_header = rack_env["HTTP_X_SHOPIFY_HMAC_SHA256"]
 
           # 1. Resolve tenant shop credentials
-          shop = find_shop(shop_domain)
+          shop = find_shop(raw_domain)
           client_secret = shop&.client_secret.presence || ENV["SHOPIFY_CLIENT_SECRET"]
 
           # 2. Bypass signature enforcement if secret is unconfigured (dev/test environments)
           if client_secret.blank?
-            return Success(skipped: true, reason: "No client secret configured for domain: #{shop_domain || 'unknown'}")
+            return Success(skipped: true, reason: "No client secret configured for domain: #{raw_domain || 'unknown'}")
           end
 
           # 3. Guard against missing HMAC header
@@ -84,10 +84,14 @@ module XEngine
 
         private
 
-        def find_shop(domain)
-          return nil if domain.blank?
+        def find_shop(raw_domain)
+          return nil if raw_domain.blank?
 
-          shop_class = defined?(Shopify::Shop) ? Shopify::Shop : XInventory::Models::Shop
+          # Normalize domain: remove http(s):// and trailing slashes
+          domain = raw_domain.to_s.sub(%r{\Ahttps?://}, "").split("/").first.presence
+          return nil unless domain
+
+          shop_class = defined?(Shopify::Shop) ? Shopify::Shop : XEngine::Shopify::Shop
           shop_class.find_by(myshopify_domain: domain) || shop_class.find_by(domain: domain)
         rescue StandardError
           nil

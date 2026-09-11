@@ -19,15 +19,15 @@
 
 # = Shopify Product Tag Database Provisioner
 #
-# Generates the target schema required to persist direct string tag assignments attached
-# to individual shopify products (+XEngine::Shopify::ProductTag+).
+# Generates the target join schema linking products to their associated tag entities
+# (+XEngine::Shopify::ProductTag+).
 #
 # == Schema Layout Matrix
-# [id]          System-managed unique primary key handling distributed lookups safely using a native +UUID+ format.
-# [product_id]  The reference link mapping the owner product model. Enforces cascading delete on product teardown.
-# [name]        The plain string token value representing the tag identity (e.g., <tt>"Summer-Collection"</tt>).
-# [created_at]  Standard ActiveRecord timestamp.
-# [updated_at]  Standard ActiveRecord timestamp.
+# [id]         Bigint primary key.
+# [product_id] Foreign reference binding to the parent product model. Enforces cascading delete.
+# [tag_id]     Foreign reference binding to the normalized tag model. Enforces cascading delete.
+# [created_at] Standard ActiveRecord timestamp.
+# [updated_at] Standard ActiveRecord timestamp.
 #
 class CreateXEngineShopifyProductTags < XEngine::Core::Database::Migration
 
@@ -35,22 +35,28 @@ class CreateXEngineShopifyProductTags < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    # Allocate bigint to id column to override the global UUID default strategy.
-    # Ensures we are able to use the numeric GID from Shopify as the naked table primary key identifier.
     localized_options = table_options.merge(id: :bigint, default: nil)
 
     create_table table_name, **localized_options do |t|
-      t.belongs_to :product, type: :bigint, foreign_key: { to_table: product_table, on_delete: :cascade }, null: false
+      t.belongs_to :product,
+                   type: :bigint,
+                   foreign_key: { to_table: product_table, on_delete: :cascade },
+                   null: false,
+                   index: true
 
-      t.string :name, null: false
+      t.belongs_to :tag,
+                   type: :bigint,
+                   foreign_key: { to_table: tag_table, on_delete: :cascade },
+                   null: false,
+                   index: true
 
       t.timestamps
 
-      # Compound index enforcing tag uniqueness per product and optimizing product lookup
-      t.index [:product_id, :name], unique: true, name: "idx_xe_shopify_prod_tags_unique"
+      # Compound index enforcing tag assignment uniqueness per product
+      t.index [:product_id, :tag_id], unique: true, name: "idx_xe_shopify_prod_tags_unique"
 
-      # High-speed reverse index for filtering products by tag name
-      t.index [:name, :product_id], name: "idx_xe_shopify_prod_tags_lookup"
+      # Reverse compound index for fast lookup of products by tag
+      t.index [:tag_id, :product_id], name: "idx_xe_shopify_prod_tags_lookup"
     end
   end
 
@@ -63,11 +69,18 @@ class CreateXEngineShopifyProductTags < XEngine::Core::Database::Migration
     @table_name ||= XEngine::Shopify::ProductTag.table_name
   end
 
-  # Resolves the fully namespaced physical table string value for the parent +Product+ resource.
+  # Resolves the fully namespaced physical table string value for the parent Product resource.
   #
   # @return [String]
   def product_table
     @product_table ||= XEngine::Shopify::Product.table_name
+  end
+
+  # Resolves the fully namespaced physical table string value for the companion Tag resource.
+  #
+  # @return [String]
+  def tag_table
+    @tag_table ||= XEngine::Shopify::Tag.table_name
   end
 
 end

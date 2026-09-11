@@ -184,17 +184,18 @@ module XEngine
       def webhook_callback_url(topic_or_resource = nil)
         raw_string = topic_or_resource.to_s.downcase
 
-        # Extract primary resource token across GQL Enums (PRODUCTS_UPDATE), REST topics (products/update), or raw names
+        # Extract primary resource token across GQL Enums (BULK_OPERATIONS_FINISH -> bulk_operations),
+        # REST topics (products/update -> products), or raw names
         resource = if raw_string.include?("/")
                      raw_string.split("/").first
                    elsif raw_string.include?("_")
-                     raw_string.split("_").first
+                     raw_string.rpartition("_").first
                    else
                      raw_string
                    end.presence || "webhooks"
 
         client = XEngine::Application["shopify"] rescue XEngine::Shopify::Client.new
-        
+
         client.callback_url_for("api/v1/#{resource}/webhook")
       end
 
