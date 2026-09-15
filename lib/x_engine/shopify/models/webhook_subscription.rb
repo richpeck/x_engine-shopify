@@ -30,9 +30,9 @@ module XEngine
     # dynamically via the engine's GraphQL representation and resync system.
     #
     # == Consolidated 2-Query Request Dispatch
-    # 1. *Un-synced (+shopify_id.blank?+):* Dispatches the +webhookSubscriptionCreate+ 
+    # 1. *Un-synced (+id.blank?+):* Dispatches the +webhookSubscriptionCreate+ 
     #    mutation payload to register the subscription on Shopify.
-    # 2. *Synced (+shopify_id.present?+):* Delegates to +HasGraphQLRepresentation+ 
+    # 2. *Synced (+id.present?+):* Delegates to +HasGraphQLRepresentation+ 
     #    to fetch the node state from Shopify via +node(id: $id)+ and refresh local state.
     #
     # == Status Management
@@ -43,9 +43,8 @@ module XEngine
     #
     # == Database Schema
     # Matches +shopify_webhooks+ table layout:
-    # * +id+ [+String+] - Primary key (UUID/String identifier).
+    # * +id+ [+String+] - Primary key (Remote Shopify Webhook Subscription GID).
     # * +shop_id+ [+String+] - Foreign key to +XEngine::Shopify::Shop+.
-    # * +shopify_id+ [+String+] - Remote Shopify Webhook Subscription GID.
     # * +topic+ [+String+] - Lowercase wire topic identifier (e.g., +"products/update"+).
     # * +status+ [+String+] - Current state (+disabled+, +active+, +failing+). Default: +"disabled"+.
     # * +fields+ [+String+] - Serialized JSON array of targeted GraphQL selection fields.
@@ -74,7 +73,6 @@ module XEngine
           id
           ... on WebhookSubscription {
             id
-            shopify_id: id
             name
             topic
             filter
@@ -88,6 +86,9 @@ module XEngine
           }
         GRAPHQL
       end
+
+      # Alias +shopify_id+ to +id+ for backwards compatibility
+      alias_attribute :shopify_id, :id
 
       # ---
       # :section: Associations
@@ -103,9 +104,8 @@ module XEngine
       # :section: Validations
       # ---
 
-      # Enforce unique remote Shopify GIDs across all database webhooks when present
-      validates :shopify_id, 
-                uniqueness: { allow_nil: true, message: "must be unique across all webhooks." }
+      # Primary key ID must be present on update once saved/synced with Shopify
+      validates :id, presence: true, on: :update
 
       # Multi-tenant isolation: Only one unique subscription per topic per shop instance
       validates :topic, 
@@ -120,15 +120,15 @@ module XEngine
 
       # Dynamically determines the appropriate GraphQL request payload depending on local record state.
       #
-      # 1. When unsourced (+shopify_id+ is blank): Constructs +webhookSubscriptionCreate+ mutation.
-      # 2. When sourced (+shopify_id+ is present): Delegates to +HasGraphQLRepresentation#build_graphql_request+
+      # 1. When unsourced (+id.blank?+): Constructs +webhookSubscriptionCreate+ mutation.
+      # 2. When sourced (+id.present?+): Delegates to +HasGraphQLRepresentation#build_graphql_request+
       #    to fetch the existing node state from Shopify via +node(id: $id)+.
       #
       # === Returns
       # * [+Array(String, Hash)+] A tuple containing the GraphQL document string and variable bindings hash.
       #
       def build_graphql_request
-        if shopify_id.blank?
+        if id.blank?
           build_creation_mutation
         else
           super # 2. Query 2: Standard node(id: $id) read fetch query via HasGraphQLRepresentation
@@ -173,7 +173,6 @@ module XEngine
               webhookSubscription {
                 __typename
                 id
-                shopify_id: id
                 topic
                 filter
                 uri

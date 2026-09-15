@@ -35,8 +35,8 @@ module XEngine
     #    extracting representation fragments from target domain models and search filters.
     # 2. *Dual-Mode Request Dispatch:* Implements +#build_graphql_request+ to yield a 
     #    dispatch mutation (+bulkOperationRunQuery+) when un-synced, or delegate to standard 
-    #    +HasGraphQLRepresentation+ polling queries once persisted with a +shopify_id+.
-    # 3. *Execution Tracking:* Persists the returned Shopify Global ID (+shopify_id+) and status 
+    #    +HasGraphQLRepresentation+ polling queries once persisted with an +id+.
+    # 3. *Execution Tracking:* Persists the returned Shopify Global ID (+id+) and status 
     #    atomically upon successful API acceptance.
     #
     # == Example Usage
@@ -56,20 +56,21 @@ module XEngine
       expose_graphql single: :node, mutation: :bulkOperationRunQuery do
         <<~GRAPHQL
           __typename
-          ... on BulkOperation {
-            shopify_id:        id
-            status
-            error_code:       errorCode
-            created_at:       createdAt
-            completed_at:     completedAt
-            object_count:     objectCount
-            root_object_count: rootObjectCount
-            file_size:         fileSize
-            url
-            partial_data_url: partialDataUrl
-        }
+          id
+          status
+          error_code:        errorCode
+          created_at:        createdAt
+          completed_at:      completedAt
+          object_count:      objectCount
+          root_object_count: rootObjectCount
+          file_size:         fileSize
+          url
+          partial_data_url:  partialDataUrl
         GRAPHQL
       end
+
+      # Alias +shopify_id+ to +id+ for backwards compatibility
+      alias_attribute :shopify_id, :id
 
       # Alias plural 'filters' to the backing 'filter' schema column for API backwards compatibility
       alias_attribute :filters, :filter
@@ -117,6 +118,7 @@ module XEngine
 
       validates :shop, presence: true
       validates :object_type, presence: true
+      validates :id, presence: true, on: :update
 
       # ---
       # :section: Lifecycle Hooks
@@ -130,10 +132,10 @@ module XEngine
 
       # Dynamically determines the appropriate GraphQL request payload depending on local record state.
       #
-      # When unsourced (+shopify_id+ is blank), constructs the +bulkOperationRunQuery+ 
+      # When unsourced (+id+ is blank), constructs the +bulkOperationRunQuery+ 
       # mutation to initiate the bulk operation on Shopify.
       #
-      # When sourced (+shopify_id+ is present), delegates to +HasGraphQLRepresentation#build_graphql_request+
+      # When sourced (+id+ is present), delegates to +HasGraphQLRepresentation#build_graphql_request+
       # to fetch current bulk operation status from Shopify.
       #
       # === Returns
@@ -144,7 +146,7 @@ module XEngine
       #   # => ["mutation BulkOperationRunQuery($query: String!) { ... }", {:query=>"{ products { ... } }"}]
       #
       def build_graphql_request
-        if shopify_id.blank?
+        if id.blank?
           build_creation_mutation
         else
           super # Delegates to HasGraphQLRepresentation standard query generator
@@ -173,7 +175,7 @@ module XEngine
             bulkOperationRunQuery(query: $query) {
               bulkOperation {
                 __typename
-                shopify_id: id
+                id
                 status
                 created_at: createdAt
                 error_code: errorCode

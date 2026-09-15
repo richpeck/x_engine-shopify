@@ -24,15 +24,14 @@
 # the Shopify API cluster (+XEngine::Shopify::WebhookSubscription+).
 #
 # == Schema Layout Matrix
-# [id]         System-managed unique primary key handling distributed lookups safely using a native +UUID+ format.
+# [id]         Canonical string primary key storing the extracted Shopify ID or GID string.
 # [shop_id]    The +uuid+ reference link to the owner store model.
 # [name]       A human-readable label identifying the registration context.
-# [shopify_id] The unique identification string returned by Shopify's subscription engine.
 # [topic]      The event string token identifying the hook context (e.g., <tt>orders/create</tt>).
 # [uri]        The target callback endpoint URI or URL destination registered with Shopify.
+# [api_version] The Shopify API version string associated with the subscription payload.
 # [filter]     An optional GraphQL-compliant matching string used by Shopify to isolate specific payloads.
 # [fields]     An optional comma-separated string array restricting dimensions of the incoming resource payload data layer.
-# [status]     The current lifecycle operational state of the endpoint registration (Default: <tt>"disabled"</tt>).
 # [notes]      Text block for logging application exceptions, failure tracing, or system alert states.
 # [created_at] Standard ActiveRecord timestamp.
 # [updated_at] Standard ActiveRecord timestamp.
@@ -45,7 +44,10 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
   # * +void+
   #
   def up 
-    create_table table_name, **table_options do |t|
+    # Allocate :string to id column to allow storing raw string GIDs or numeric IDs directly.
+    localized_options = table_options.merge(id: :string, default: nil)
+
+    create_table table_name, **localized_options do |t|
 
       # Belonging Shop (UUID Scope)
       t.belongs_to :shop, 
@@ -58,7 +60,6 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
       t.string :name, null: true
 
       # Shopify Remote Identity & Settings
-      t.string :shopify_id, null: true
       t.string :topic, null: false, index: true
       t.text   :uri, null: true
       t.string :api_version, null: true
@@ -73,7 +74,7 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
       t.timestamps
 
       # Primary conflict target for bulk upserts across tenant shops
-      t.index [:shop_id, :shopify_id], unique: true, name: "idx_shopify_webhooks_shop_shopify_id"
+      t.index [:shop_id, :id], unique: true, name: "idx_shopify_webhooks_shop_id"
 
       # Compound index supporting multi-endpoint configurations per topic
       t.index [:shop_id, :topic, :uri], unique: true, name: "idx_shopify_webhooks_shop_topic_uri"
