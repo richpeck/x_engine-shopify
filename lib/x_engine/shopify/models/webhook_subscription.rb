@@ -21,19 +21,12 @@ module XEngine
   module Shopify
     # = Shopify Webhook Model
     #
-    # Represents a state-aware webhook endpoint subscription profile mapped 
-    # to a distinct parent Shopify Store tenant (+XEngine::Shopify::Shop+).
+    # Mapped to a distinct parent Shopify Store tenant (+XEngine::Shopify::Shop+).
     #
     # == Architecture & Responsibilities
     # This model acts as an ActiveRecord persistence layer for webhook states.
-    # Synchronization, mutation dispatching, and topic resolution are handled 
-    # dynamically via the engine's GraphQL representation and resync system.
-    #
-    # == Consolidated 2-Query Request Dispatch
-    # 1. *Un-synced (+id.blank?+):* Dispatches the +webhookSubscriptionCreate+ 
-    #    mutation payload to register the subscription on Shopify.
-    # 2. *Synced (+id.present?+):* Delegates to +HasGraphQLRepresentation+ 
-    #    to fetch the node state from Shopify via +node(id: $id)+ and refresh local state.
+    # Remote platform registration, unregistration, and dashboard schema configurations
+    # are declared via engine extensions.
     #
     # == Status Management
     # Managed via standard ActiveRecord enum:
@@ -66,8 +59,8 @@ module XEngine
       # :section: GraphQL Serialization Layouts
       # ---
 
-      # Exposes local model attributes back to GraphQL nodes when fetching or creating webhook state.
-      expose_graphql single: :node, multiple: :nodes, mutation: "webhookSubscriptionCreate" do
+      # Exposes local model attributes back to GraphQL nodes when fetching webhook state.
+      expose_graphql single: :node, multiple: :nodes do
         <<~GRAPHQL
           __typename
           id
@@ -86,9 +79,6 @@ module XEngine
           }
         GRAPHQL
       end
-
-      # Alias +shopify_id+ to +id+ for backwards compatibility
-      alias_attribute :shopify_id, :id
 
       # ---
       # :section: Associations
@@ -118,23 +108,6 @@ module XEngine
       # :section: Instance Methods
       # ---
 
-      # Dynamically determines the appropriate GraphQL request payload depending on local record state.
-      #
-      # 1. When unsourced (+id.blank?+): Constructs +webhookSubscriptionCreate+ mutation.
-      # 2. When sourced (+id.present?+): Delegates to +HasGraphQLRepresentation#build_graphql_request+
-      #    to fetch the existing node state from Shopify via +node(id: $id)+.
-      #
-      # === Returns
-      # * [+Array(String, Hash)+] A tuple containing the GraphQL document string and variable bindings hash.
-      #
-      def build_graphql_request
-        if id.blank?
-          build_creation_mutation
-        else
-          super # 2. Query 2: Standard node(id: $id) read fetch query via HasGraphQLRepresentation
-        end
-      end
-
       # Formats the topic string into Shopify's upper-cased GraphQL Enum representation.
       #
       # === Returns
@@ -156,48 +129,6 @@ module XEngine
         name.to_s
             .parameterize(separator: "_")
             .gsub(/[^a-zA-Z0-9_-]/, "")
-      end
-
-      private
-
-      # Query 1: Generates the +webhookSubscriptionCreate+ GraphQL mutation tuple.
-      #
-      # === Returns
-      # * [+Array(String, Hash)+] Mutation GQL document and variables hash.
-      # @api private
-      #
-      def build_creation_mutation
-        mutation = <<~GRAPHQL
-          mutation WebhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $subscription: WebhookSubscriptionInput!) {
-            webhookSubscriptionCreate(topic: $topic, webhookSubscription: $subscription) {
-              webhookSubscription {
-                __typename
-                id
-                topic
-                filter
-                uri
-                fields: includeFields
-                created_at: createdAt
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }
-        GRAPHQL
-
-        variables = {
-          topic: graphql_topic_enum,
-          subscription: {
-            name: graphql_name,
-            uri: shop&.webhook_callback_url(topic),
-            includeFields: fields.presence,
-            filter: filter.presence
-          }.compact
-        }
-
-        [mutation, variables]
       end
     end
   end

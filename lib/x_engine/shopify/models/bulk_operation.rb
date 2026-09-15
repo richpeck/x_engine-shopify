@@ -33,20 +33,16 @@ module XEngine
     # == Key Responsibilities
     # 1. *Query Construction:* Dynamically builds Shopify-compliant GraphQL bulk queries by 
     #    extracting representation fragments from target domain models and search filters.
-    # 2. *Dual-Mode Request Dispatch:* Implements +#build_graphql_request+ to yield a 
-    #    dispatch mutation (+bulkOperationRunQuery+) when un-synced, or delegate to standard 
-    #    +HasGraphQLRepresentation+ polling queries once persisted with an +id+.
-    # 3. *Execution Tracking:* Persists the returned Shopify Global ID (+id+) and status 
-    #    atomically upon successful API acceptance.
+    # 2. *Standardized GraphQL Polling:* Delegates to +HasGraphQLRepresentation+ polling 
+    #    queries once persisted with a numeric +id+.
+    # 3. *Execution Tracking:* Persists the returned Shopify ID and status atomically 
+    #    upon successful API acceptance.
     #
     # == Example Usage
-    #   bulk_op = shop.bulk_operations.build(
-    #     object_type: "XEngine::Shopify::Product",
-    #     filter: "created_at:2026-01-01..2026-12-31"
-    #   )
-    #
-    #   query, variables = bulk_op.build_graphql_request
-    #   response = shop.graphql_client.query(query: query, variables: variables)
+    #    bulk_op = shop.bulk_operations.build(
+    #      object_type: "XEngine::Shopify::Product",
+    #      filter: "created_at:2026-01-01..2026-12-31"
+    #    )
     #
     class BulkOperation < XEngine::Core::Model
       include XEngine::Shopify::HasGraphQLRepresentation
@@ -56,21 +52,29 @@ module XEngine
       expose_graphql single: :node, mutation: :bulkOperationRunQuery do
         <<~GRAPHQL
           __typename
-          id
-          status
-          error_code:        errorCode
-          created_at:        createdAt
-          completed_at:      completedAt
-          object_count:      objectCount
-          root_object_count: rootObjectCount
-          file_size:         fileSize
-          url
-          partial_data_url:  partialDataUrl
+          ... on BulkOperation {
+            id
+            status
+            error_code:        errorCode
+            created_at:        createdAt
+            completed_at:      completedAt
+            object_count:      objectCount
+            root_object_count: rootObjectCount
+            file_size:         fileSize
+            url
+            partial_data_url: partialDataUrl
+          }
         GRAPHQL
       end
 
-      # Alias +shopify_id+ to +id+ for backwards compatibility
-      alias_attribute :shopify_id, :id
+      # Custom reader/writer for id to cleanly extract numeric ID tails from GID strings
+      def id=(value)
+        return super(nil) if value.blank?
+
+        str_val = value.to_s
+        extracted = str_val[/\d+$/] || str_val.split("/").last
+        super(extracted)
+      end
 
       # Alias plural 'filters' to the backing 'filter' schema column for API backwards compatibility
       alias_attribute :filters, :filter
@@ -118,7 +122,6 @@ module XEngine
 
       validates :shop, presence: true
       validates :object_type, presence: true
-      validates :id, presence: true, on: :update
 
       # ---
       # :section: Lifecycle Hooks
@@ -130,29 +133,6 @@ module XEngine
       # :section: Instance Methods
       # ---
 
-      # Dynamically determines the appropriate GraphQL request payload depending on local record state.
-      #
-      # When unsourced (+id+ is blank), constructs the +bulkOperationRunQuery+ 
-      # mutation to initiate the bulk operation on Shopify.
-      #
-      # When sourced (+id+ is present), delegates to +HasGraphQLRepresentation#build_graphql_request+
-      # to fetch current bulk operation status from Shopify.
-      #
-      # === Returns
-      # * [+Array(String, Hash)+] A tuple containing the GraphQL string document and variable bindings hash.
-      #
-      # === Examples
-      #   bulk_op.build_graphql_request
-      #   # => ["mutation BulkOperationRunQuery($query: String!) { ... }", {:query=>"{ products { ... } }"}]
-      #
-      def build_graphql_request
-        if id.blank?
-          build_creation_mutation
-        else
-          super # Delegates to HasGraphQLRepresentation standard query generator
-        end
-      end
-
       # Helper indicating if the bulk operation execution has completed successfully on Shopify.
       #
       # === Returns
@@ -162,34 +142,22 @@ module XEngine
         status.to_s.downcase == "completed"
       end
 
-      private
-
-      # Generates the +bulkOperationRunQuery+ GraphQL mutation tuple for initializing a bulk operation on Shopify.
+      # Checks if the remote JSONL download URL has expired.
+      #
+      # Shopify bulk operation download URLs are ephemeral and expire strictly 7 days 
+      # after completion. Evaluates the URL presence and tests timestamp age against 7 days ago.
       #
       # === Returns
-      # * [+Array(String, Hash)+] Mutation GQL document and variables hash containing the inner query payload.
+      # * [+Boolean+] +true+ if URL is blank or completion timestamp is older than 7 days, otherwise +false+.
       #
-      def build_creation_mutation
-        mutation = <<~GRAPHQL
-          mutation BulkOperationRunQuery($query: String!) {
-            bulkOperationRunQuery(query: $query) {
-              bulkOperation {
-                __typename
-                id
-                status
-                created_at: createdAt
-                error_code: errorCode
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }
-        GRAPHQL
+      def url_expired?
+        return true if url.blank?
 
-        [mutation, { query: query.to_s.strip }]
+        timestamp = completed_at || updated_at || created_at
+        timestamp.blank? || timestamp < 7.days.ago
       end
+
+      private
 
       # Resolves the target model class and constructs the formatted Shopify bulk GraphQL query string.
       #
@@ -233,21 +201,6 @@ module XEngine
             }
           }
         GRAPHQL
-      end
-
-      # Checks if the remote JSONL download URL has expired.
-      #
-      # Shopify bulk operation download URLs are ephemeral and expire strictly 7 days 
-      # after completion. Evaluates the URL presence and tests timestamp age against 7 days ago.
-      #
-      # === Returns
-      # * [+Boolean+] +true+ if URL is blank or completion timestamp is older than 7 days, otherwise +false+.
-      #
-      def url_expired?
-        return true if url.blank?
-
-        timestamp = completed_at || updated_at || created_at
-        timestamp.blank? || timestamp < 7.days.ago
       end
 
     end
