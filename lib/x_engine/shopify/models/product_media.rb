@@ -59,6 +59,7 @@ module XEngine
           
           # 1. Standard 2D Graphical Images
           ... on MediaImage {
+            alt
             image {
               url
               height

@@ -75,7 +75,9 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
+          legacy_id: legacyResourceId
           created_at: createdAt
+          updated_at: updatedAt
           note
           totalRefundedSet {
             shopMoney {

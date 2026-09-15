@@ -122,7 +122,7 @@ module XEngine
       has_many :tags, through: :product_tags, class_name: "XEngine::Shopify::Tag"
 
       # Explicit join model replacing HABTM
-      has_many :collection_products, class_name: "XEngine::Shopify::CollectionProduct", dependent: :destroy, inverse_of: :product
+      has_many :collection_products, class_name: "XEngine::Shopify::ProductCollection", dependent: :destroy, inverse_of: :product
       has_many :collections, -> { distinct }, through: :collection_products, class_name: "XEngine::Shopify::Collection"
 
       has_many :line_items, class_name: "XEngine::Shopify::LineItem", inverse_of: :product

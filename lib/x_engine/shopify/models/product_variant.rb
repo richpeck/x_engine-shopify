@@ -45,6 +45,7 @@ module XEngine
           price
           sku
           barcode
+          created_at: createdAt
           product_id: product {
             id: legacyResourceId
           }

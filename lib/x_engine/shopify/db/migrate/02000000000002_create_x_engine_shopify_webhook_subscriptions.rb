@@ -58,7 +58,7 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
       t.string :name, null: true
 
       # Shopify Remote Identity & Settings
-      t.string :shopify_id, null: true, index: { unique: true }
+      t.string :shopify_id, null: true
       t.string :topic, null: false, index: true
       t.text   :uri, null: true
       t.string :api_version, null: true
@@ -71,6 +71,9 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
       t.text   :notes
 
       t.timestamps
+
+      # Primary conflict target for bulk upserts across tenant shops
+      t.index [:shop_id, :shopify_id], unique: true, name: "idx_shopify_webhooks_shop_shopify_id"
 
       # Compound index supporting multi-endpoint configurations per topic
       t.index [:shop_id, :topic, :uri], unique: true, name: "idx_shopify_webhooks_shop_topic_uri"
@@ -94,5 +97,4 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
   def shop_table
     @shop_table ||= XEngine::Shopify::Shop.table_name
   end
-  
 end
