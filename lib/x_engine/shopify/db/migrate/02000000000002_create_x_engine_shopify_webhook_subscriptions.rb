@@ -45,7 +45,7 @@ class CreateXEngineShopifyWebhookSubscriptions < XEngine::Core::Database::Migrat
   #
   def up 
     # Allocate :string to id column to allow storing raw string GIDs or numeric IDs directly.
-    localized_options = table_options.merge(id: :string, default: nil)
+    localized_options = table_options.merge(id: :bigint, default: nil)
 
     create_table table_name, **localized_options do |t|
 

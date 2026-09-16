@@ -45,7 +45,7 @@ class CreateXEngineShopifyBulkOperations < XEngine::Core::Database::Migration
   # @return [void]
   def up 
     # Allocate :string to id column to allow storing raw string GIDs or UUIDs directly.
-    localized_options = table_options.merge(id: :string, default: nil)
+    localized_options = table_options.merge(id: :bigint, default: nil)
 
     create_table table_name, **localized_options do |t|
       # Multi-tenant relation anchor point
