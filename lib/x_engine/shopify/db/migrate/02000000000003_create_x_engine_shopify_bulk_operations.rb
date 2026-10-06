@@ -26,6 +26,7 @@
 # [shop_id]            The +uuid+ reference linking the operation to the requesting store.
 # [object_type]        The target Shopify domain model class token (e.g., +"Product"+, +"Collection"+, +"Order"+).
 # [filter]             The raw search/filter criteria string applied to the bulk request (e.g., +"status:active"+).
+# [arguments]          JSON/text payload storing root connection arguments (e.g., type: "metaobject_handle").
 # [status]             The execution tracking state token returned from the GraphQL endpoint.
 # [error_code]         The exception profile raised during engine runtime processing blocks or API userErrors.
 # [error_message]      Human-readable failure details aggregated from userErrors or system exceptions.
@@ -54,6 +55,7 @@ class CreateXEngineShopifyBulkOperations < XEngine::Core::Database::Migration
       # Operational Scope & Targets
       t.string   :object_type,   null: true # RPECK 22/08/2026 - allowed null for this to allow resync
       t.string   :filter,        null: true
+      t.string   :arguments,     null: true # RPECK 06/10/2026 - store root GraphQL arguments (e.g. type handles)
 
       # Shopify Tracking Metadata
       t.string   :status,        null: false, default: "CREATED"

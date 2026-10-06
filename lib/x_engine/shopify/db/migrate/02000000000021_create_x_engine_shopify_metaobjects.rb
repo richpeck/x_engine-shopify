@@ -42,7 +42,7 @@ class CreateXEngineShopifyMetaobjects < XEngine::Core::Database::Migration
 
     create_table table_name, **localized_options do |t|
       t.belongs_to :shop,
-                   type: :bigint,
+                   type: :uuid,
                    foreign_key: { to_table: shop_table, on_delete: :cascade },
                    null: false,
                    index: true

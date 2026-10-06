@@ -32,7 +32,8 @@ module XEngine
     #
     # == Key Responsibilities
     # 1. *Query Construction:* Dynamically builds Shopify-compliant GraphQL bulk queries by 
-    #    extracting representation fragments from target domain models and search filters.
+    #    extracting representation fragments from target domain models, prefixing with search filters, 
+    #    and concatenating any additional root arguments.
     # 2. *Standardized GraphQL Polling:* Delegates to +HasGraphQLRepresentation+ polling 
     #    queries once persisted with a numeric +id+.
     # 3. *Execution Tracking:* Persists the returned Shopify ID and status atomically 
@@ -40,8 +41,9 @@ module XEngine
     #
     # == Example Usage
     #    bulk_op = shop.bulk_operations.build(
-    #      object_type: "XEngine::Shopify::Product",
-    #      filter: "created_at:2026-01-01..2026-12-31"
+    #      object_type: "XEngine::Shopify::Metaobject",
+    #      filter: "updated_at:>2026-01-01",
+    #      arguments: 'type: "my_metaobject_type"'
     #    )
     #
     class BulkOperation < XEngine::Core::Model
@@ -106,6 +108,19 @@ module XEngine
         resolve_and_set_query if object_type.present?
       end
 
+      # Custom writer for +arguments+ to re-compile the outbound query document on assignment.
+      #
+      # === Parameters
+      # * +value+ [+String+, +nil+] - Additional argument string concatenated after the query filter (e.g., 'type: "author"').
+      #
+      # === Returns
+      # * [+String+, +nil+] The assigned arguments value.
+      #
+      def arguments=(value)
+        super
+        resolve_and_set_query if object_type.present?
+      end
+
       # ---
       # :section: Associations
       # ---
@@ -162,8 +177,8 @@ module XEngine
       # Resolves the target model class and constructs the formatted Shopify bulk GraphQL query string.
       #
       # Inspects +object_type+ to obtain the target class's root GraphQL field name and selection set 
-      # from +_graphql_query_block+. Wraps the inner fields in the +edges { node { ... } }+ structure 
-      # required by Shopify's bulk API parser.
+      # from +_graphql_query_block+. Always includes the +query:+ filter argument first, and appends 
+      # any extra custom +arguments+ string right after it.
       #
       # === Returns
       # * [+String+] The compiled query string written directly to the +query+ attribute.
@@ -183,16 +198,22 @@ module XEngine
 
         selection = target_klass.graphql_query.indent(8)
         
-        # Explicitly read from self.filter to capture unsaved attribute changes
+        # Explicitly read attributes to capture unsaved in-memory changes
         raw_filter = read_attribute(:filter).presence || filter.presence
         active_filter = raw_filter || (target_klass.respond_to?(:graphql_default_filter) ? target_klass.graphql_default_filter : nil)
 
-        # Safely construct the GraphQL query argument
-        query_filter = active_filter.present? ? "(query: #{active_filter.strip.to_json})" : ""
+        raw_args = read_attribute(:arguments).presence || arguments.presence
+
+        # Ensure 'query' is always first, followed by any additional argument strings concatenated
+        arg_parts = []
+        arg_parts << "query: #{active_filter.strip.to_json}" if active_filter.present?
+        arg_parts << raw_args.strip if raw_args.present?
+
+        query_arguments = arg_parts.any? ? "(#{arg_parts.join(', ')})" : ""
 
         self.query = <<~GRAPHQL.strip
           {
-            #{root_field}#{query_filter} {
+            #{root_field}#{query_arguments} {
               edges {
                 node {
           #{selection}
