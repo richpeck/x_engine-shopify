@@ -44,7 +44,7 @@ module XEngine
           fields {
             key
             value
-            type
+            field_type: type
           }
         GRAPHQL
       end
