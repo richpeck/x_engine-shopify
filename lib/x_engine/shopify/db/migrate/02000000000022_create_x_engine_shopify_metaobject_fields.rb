@@ -25,7 +25,7 @@
 # belonging to a Shopify Metaobject (+XEngine::Shopify::MetaobjectField+).
 #
 # == Schema Layout Matrix
-# [id]            Bigint primary key.
+# [id]            UUID primary key.
 # [metaobject_id] Foreign reference binding to the parent metaobject model. Enforces cascading delete.
 # [key]           Field key name (e.g., "title", "color", "rating").
 # [value]         Raw or scalar text value representation.
@@ -39,7 +39,7 @@ class CreateXEngineShopifyMetaobjectFields < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    localized_options = table_options.merge(id: :bigint, default: nil)
+    localized_options = table_options.merge(id: :uuid, default: nil)
 
     create_table table_name, **localized_options do |t|
       t.belongs_to :metaobject,
