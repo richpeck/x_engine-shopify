@@ -39,7 +39,7 @@ module XEngine
         <<~GRAPHQL
           __typename
           id
-          type
+          metaobject_type: type
           handle
           fields {
             key

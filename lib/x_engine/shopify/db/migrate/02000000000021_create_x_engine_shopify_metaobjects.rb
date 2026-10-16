@@ -47,7 +47,7 @@ class CreateXEngineShopifyMetaobjects < XEngine::Core::Database::Migration
                    null: false,
                    index: true
 
-      t.string :type, null: false
+      t.string :metaobject_type, null: false
       t.string :handle, null: false
 
       t.timestamps
