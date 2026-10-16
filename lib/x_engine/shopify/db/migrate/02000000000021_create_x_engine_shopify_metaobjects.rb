@@ -53,10 +53,10 @@ class CreateXEngineShopifyMetaobjects < XEngine::Core::Database::Migration
       t.timestamps
 
       # Compound index enforcing unique metaobject handles per shop and type
-      t.index [:shop_id, :type, :handle], unique: true, name: "idx_xe_shopify_metaobjects_unique"
+      t.index [:shop_id, :metaobject_type, :handle], unique: true, name: "idx_xe_shopify_metaobjects_unique"
 
       # Index for filtering metaobjects by type across a shop
-      t.index [:shop_id, :type], name: "idx_xe_shopify_metaobjects_type_lookup"
+      t.index [:shop_id, :metaobject_type], name: "idx_xe_shopify_metaobjects_type_lookup"
     end
   end
 
