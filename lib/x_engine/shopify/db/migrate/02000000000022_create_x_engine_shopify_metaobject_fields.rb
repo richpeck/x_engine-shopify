@@ -39,7 +39,7 @@ class CreateXEngineShopifyMetaobjectFields < XEngine::Core::Database::Migration
   #
   # @return [void]
   def up
-    create_table table_name, table_options do |t|
+    create_table table_name, **table_options do |t|
       t.belongs_to :metaobject,
                    type: :bigint,
                    foreign_key: { to_table: metaobject_table, on_delete: :cascade },
