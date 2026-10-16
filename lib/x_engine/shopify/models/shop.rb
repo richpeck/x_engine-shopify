@@ -103,6 +103,7 @@ module XEngine
         webhook_subscriptions
         product_media
         metafields
+        metaobjects
       ].each do |assoc|
         target_class_name = ASSOCIATION_CLASS_OVERRIDES[assoc] || assoc.to_s.classify
 
