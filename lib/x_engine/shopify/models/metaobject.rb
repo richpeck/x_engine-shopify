@@ -45,6 +45,15 @@ module XEngine
             key
             value
             field_type: type
+            reference {
+              __typename
+              ... on MediaImage {
+                image {
+                  url
+                  altText
+                }
+              }
+            }
           }
         GRAPHQL
       end
