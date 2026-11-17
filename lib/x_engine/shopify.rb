@@ -19,6 +19,7 @@
 # frozen_string_literal: true
 
 require "dry/system"
+require "ostruct" # => RPECK 17/11/2026 - Added here otherwise GQL calls fail as OpenStruct not available
 
 # = XEngine Framework Extension Suite
 #
